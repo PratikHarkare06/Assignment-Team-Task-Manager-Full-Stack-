@@ -1,18 +1,23 @@
-import React, { useState, useEffect } from 'react';
-import { useSelector } from 'react-redux';
-import { Camera, Mail, Moon, Sun } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { Camera, Mail, Moon, Sun, Upload, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import api from '../services/api';
+import { updateUserProfile } from '../redux/slices/authSlice';
 
 export default function Settings() {
+  const dispatch = useDispatch();
   const { user } = useSelector(s => s.auth);
+  const fileInputRef = useRef(null);
+
   const [profile, setProfile] = useState({
     firstName: (user?.name || 'Alex').split(' ')[0],
-    lastName: (user?.name || 'Rivers').split(' ')[1] || 'Rivers',
-    email: user?.email || 'alex.rivers@momentum.io',
+    lastName: (user?.name || 'Rivers').split(' ').slice(1).join(' ') || 'Rivers',
+    email: user?.email || '',
     jobTitle: 'Senior Project Manager',
   });
-  // Dark mode — synced with the same key AppLayout uses
+  const [avatarData, setAvatarData] = useState(user?.avatar || '');
+
+  // Dark mode — synced with AppLayout
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('theme-dark') === 'true');
 
   const toggleDark = () => {
@@ -20,18 +25,42 @@ export default function Settings() {
     setDarkMode(next);
     localStorage.setItem('theme-dark', String(next));
     document.documentElement.classList.toggle('dark', next);
+    window.dispatchEvent(new Event('theme-change'));
   };
+
   const [notifPrefs, setNotifPrefs] = useState({ taskAssigned: true, mentions: true, deadlines: true, weeklyDigest: false });
   const [saving, setSaving] = useState(false);
+
+  const handleAvatarUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Avatar file size must be less than 2MB');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setAvatarData(reader.result);
+      toast.success('Avatar selected. Click "Save Changes" to apply.');
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleSave = async (e) => {
     e.preventDefault();
     setSaving(true);
     try {
-      await api.put('/users/profile', { name: `${profile.firstName} ${profile.lastName}` });
+      await dispatch(updateUserProfile({
+        name: `${profile.firstName} ${profile.lastName}`.trim(),
+        avatar: avatarData,
+      })).unwrap();
       toast.success('Profile updated!');
-    } catch { toast.error('Failed to update profile'); }
-    finally { setSaving(false); }
+    } catch (err) {
+      toast.error(err || 'Failed to update profile');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const initials = `${profile.firstName[0] || ''}${profile.lastName[0] || ''}`.toUpperCase();
@@ -52,19 +81,44 @@ export default function Settings() {
           {/* Avatar */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 24 }}>
             <div style={{ position: 'relative' }}>
-              <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', fontWeight: 700, color: 'white' }}>
-                {initials}
-              </div>
-              <div style={{ position: 'absolute', bottom: 0, right: 0, width: 22, height: 22, background: 'var(--accent)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white', cursor: 'pointer' }}>
-                <Camera size={11} color="white" />
+              {avatarData ? (
+                <img
+                  src={avatarData}
+                  alt="Avatar"
+                  style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--accent)' }}
+                />
+              ) : (
+                <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', fontWeight: 700, color: 'white' }}>
+                  {initials}
+                </div>
+              )}
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                style={{ position: 'absolute', bottom: 0, right: 0, width: 24, height: 24, background: 'var(--accent)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white', cursor: 'pointer' }}
+                title="Change Avatar"
+              >
+                <Camera size={12} color="white" />
               </div>
             </div>
             <div>
               <div style={{ fontWeight: 600, marginBottom: 2 }}>Profile Picture</div>
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-3)', marginBottom: 8 }}>JPG, GIF or PNG. Max size of 800K</div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-3)', marginBottom: 8 }}>JPG, PNG or GIF. Max size of 2MB</div>
               <div style={{ display: 'flex', gap: 10 }}>
-                <button className="btn btn-secondary btn-sm">Upload New</button>
-                <button className="btn btn-ghost btn-sm link">Remove</button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarUpload}
+                  style={{ display: 'none' }}
+                />
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => fileInputRef.current?.click()}>
+                  <Upload size={12} /> Upload New
+                </button>
+                {avatarData && (
+                  <button type="button" className="btn btn-ghost btn-sm link" onClick={() => setAvatarData('')}>
+                    <Trash2 size={12} /> Remove
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -84,7 +138,7 @@ export default function Settings() {
               <label className="form-label">Email Address</label>
               <div style={{ position: 'relative' }}>
                 <Mail size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-3)' }} />
-                <input className="form-input" style={{ paddingLeft: 36 }} value={profile.email} onChange={e => setProfile({ ...profile, email: e.target.value })} />
+                <input className="form-input" style={{ paddingLeft: 36 }} value={profile.email} disabled />
               </div>
             </div>
             <div className="form-group">
@@ -112,6 +166,7 @@ export default function Settings() {
               <div style={{ fontSize: '0.8rem', color: 'var(--text-3)' }}>Switch between light and dark themes.</div>
             </div>
             <button
+              type="button"
               className={`toggle ${darkMode ? 'on' : ''}`}
               onClick={toggleDark}
             />
@@ -133,6 +188,7 @@ export default function Settings() {
           ].map((n, i) => (
             <div key={n.key} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 0', borderBottom: i < 3 ? '1px solid var(--border)' : 'none' }}>
               <button
+                type="button"
                 onClick={() => setNotifPrefs({ ...notifPrefs, [n.key]: !notifPrefs[n.key] })}
                 style={{ width: 20, height: 20, borderRadius: '50%', background: notifPrefs[n.key] ? 'var(--accent)' : 'var(--border)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background .2s' }}
               >

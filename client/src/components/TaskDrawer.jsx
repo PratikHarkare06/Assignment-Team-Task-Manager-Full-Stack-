@@ -330,6 +330,81 @@ export default function TaskDrawer({ taskId, onClose }) {
               </div>
             </div>
 
+            {/* Time Tracking */}
+            <div style={{
+              background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, padding: 14,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Clock size={13} /> Time Tracking
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const newLogged = (task.loggedHours || 0) + 1;
+                    await dispatch(updateTask({ id: task._id, data: { loggedHours: newLogged } })).unwrap();
+                    setTask(t => ({ ...t, loggedHours: newLogged }));
+                    toast.success('Logged +1h');
+                  }}
+                  className="btn btn-secondary btn-sm"
+                  style={{ padding: '2px 8px', fontSize: '0.72rem' }}
+                >
+                  + 1h Logged
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-3)', marginBottom: 2 }}>Logged (hrs)</div>
+                  <input
+                    type="number"
+                    min="0"
+                    value={task.loggedHours || 0}
+                    onChange={async (e) => {
+                      const val = Math.max(0, Number(e.target.value) || 0);
+                      setTask(t => ({ ...t, loggedHours: val }));
+                      await dispatch(updateTask({ id: task._id, data: { loggedHours: val } }));
+                    }}
+                    style={{
+                      width: '100%', padding: '4px 8px', borderRadius: 6,
+                      border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-1)',
+                      fontSize: '0.82rem', outline: 'none', boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-3)', marginBottom: 2 }}>Estimated (hrs)</div>
+                  <input
+                    type="number"
+                    min="0"
+                    value={task.estimatedHours || 0}
+                    onChange={async (e) => {
+                      const val = Math.max(0, Number(e.target.value) || 0);
+                      setTask(t => ({ ...t, estimatedHours: val }));
+                      await dispatch(updateTask({ id: task._id, data: { estimatedHours: val } }));
+                    }}
+                    style={{
+                      width: '100%', padding: '4px 8px', borderRadius: 6,
+                      border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-1)',
+                      fontSize: '0.82rem', outline: 'none', boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+              </div>
+
+              {task.estimatedHours > 0 && (
+                <div className="progress-bar" style={{ marginTop: 10 }}>
+                  <div
+                    className="progress-fill"
+                    style={{
+                      width: `${Math.min(100, Math.round(((task.loggedHours || 0) / task.estimatedHours) * 100))}%`,
+                      background: (task.loggedHours || 0) > task.estimatedHours ? '#E5484D' : 'var(--accent)',
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+
             {/* Description */}
             <div>
               <div style={{

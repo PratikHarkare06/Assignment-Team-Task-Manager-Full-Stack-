@@ -77,6 +77,15 @@ export const fetchAllUsers = createAsyncThunk('auth/fetchAllUsers', async (_, { 
   }
 });
 
+export const updateUserProfile = createAsyncThunk('auth/updateUserProfile', async (data, { rejectWithValue }) => {
+  try {
+    const res = await api.put('/users/profile', data);
+    return res.data.user;
+  } catch (err) {
+    return rejectWithValue(err.response?.data?.message || 'Failed to update profile');
+  }
+});
+
 // ─── Slice ─────────────────────────────────────────────────────────────────
 const authSlice = createSlice({
   name: 'auth',
@@ -150,7 +159,13 @@ const authSlice = createSlice({
       })
 
       // All users
-      .addCase(fetchAllUsers.fulfilled, (state, action) => { state.users = action.payload; });
+      .addCase(fetchAllUsers.fulfilled, (state, action) => {
+        state.users = action.payload;
+      })
+
+      .addCase(updateUserProfile.fulfilled, (state, action) => {
+        state.user = { ...state.user, ...action.payload };
+      });
   },
 });
 

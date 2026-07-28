@@ -12,7 +12,7 @@ async function logActivity(task, actor, action, field = '', from = '', to = '') 
 // @access  Private
 const createTask = async (req, res) => {
   try {
-    let { title, description, assignedTo, projectId, priority, dueDate, status } = req.body;
+    let { title, description, assignedTo, projectId, priority, dueDate, status, estimatedHours, loggedHours } = req.body;
     if (priority) priority = priority.toLowerCase();
     if (status)   status   = status.toLowerCase().replace(' ', '-');
 
@@ -28,6 +28,8 @@ const createTask = async (req, res) => {
       status:   status   || 'todo',
       priority: priority || 'medium',
       dueDate,
+      estimatedHours: Number(estimatedHours) || 0,
+      loggedHours:    Number(loggedHours) || 0,
       createdBy: req.user._id,
       activityLog: [{ actor: req.user._id, action: 'created this task', field: '', from: '', to: '' }],
     });
@@ -125,7 +127,7 @@ const updateTask = async (req, res) => {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
 
-    let { title, description, assignedTo, status, priority, dueDate } = req.body;
+    let { title, description, assignedTo, status, priority, dueDate, estimatedHours, loggedHours } = req.body;
     if (status)   status   = status.toLowerCase().replace(' ', '-');
     if (priority) priority = priority.toLowerCase();
 
@@ -153,6 +155,14 @@ const updateTask = async (req, res) => {
     if (dueDate !== undefined) {
       logActivity(task, req.user._id, `changed due date`, 'dueDate', task.dueDate ? new Date(task.dueDate).toDateString() : '—', dueDate ? new Date(dueDate).toDateString() : '—');
       task.dueDate = dueDate;
+    }
+    if (estimatedHours !== undefined && Number(estimatedHours) !== task.estimatedHours) {
+      logActivity(task, req.user._id, `updated estimated hours to ${estimatedHours}h`, 'estimatedHours', `${task.estimatedHours}h`, `${estimatedHours}h`);
+      task.estimatedHours = Number(estimatedHours) || 0;
+    }
+    if (loggedHours !== undefined && Number(loggedHours) !== task.loggedHours) {
+      logActivity(task, req.user._id, `logged ${Number(loggedHours) - task.loggedHours}h`, 'loggedHours', `${task.loggedHours}h`, `${loggedHours}h`);
+      task.loggedHours = Number(loggedHours) || 0;
     }
 
     await task.save();

@@ -49,12 +49,14 @@ const taskSchema = new mongoose.Schema(
     priority: {
       type: String, enum: ['low', 'medium', 'high', 'critical'], default: 'medium',
     },
-    dueDate:     { type: Date, default: null },
-    createdBy:   { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    comments:    [commentSchema],
-    attachments: [attachmentSchema],
-    activityLog: [activityLogSchema],
-    reminderSent: { type: Boolean, default: false },
+    dueDate:        { type: Date, default: null },
+    estimatedHours: { type: Number, default: 0 },
+    loggedHours:    { type: Number, default: 0 },
+    createdBy:      { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    comments:       [commentSchema],
+    attachments:    [attachmentSchema],
+    activityLog:    [activityLogSchema],
+    reminderSent:   { type: Boolean, default: false },
   },
   { timestamps: true }
 );

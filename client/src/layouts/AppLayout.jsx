@@ -47,6 +47,37 @@ export default function AppLayout() {
   }, [darkMode]);
 
   useEffect(() => {
+    const syncTheme = () => {
+      setDarkMode(localStorage.getItem('theme-dark') === 'true');
+    };
+    window.addEventListener('theme-change', syncTheme);
+    return () => window.removeEventListener('theme-change', syncTheme);
+  }, []);
+
+  // Global Keyboard Shortcuts (Cmd+K / Ctrl+K or / to search, N to open tasks)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const activeEl = document.activeElement;
+      const isInput = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable);
+
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        const searchInput = document.getElementById('global-search');
+        if (searchInput) searchInput.focus();
+      } else if (!isInput && e.key === '/') {
+        e.preventDefault();
+        const searchInput = document.getElementById('global-search');
+        if (searchInput) searchInput.focus();
+      } else if (!isInput && (e.key === 'n' || e.key === 'N')) {
+        e.preventDefault();
+        navigate('/tasks');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [navigate]);
+
+  useEffect(() => {
     if (!user?._id) return;
 
     // Fetch initial unread count
@@ -252,9 +283,13 @@ export default function AppLayout() {
             onClick={() => navigate('/settings')}
             style={collapsed ? { justifyContent: 'center', background: 'transparent', padding: '8px 0' } : {}}
           >
-            <div className="avatar" style={{ background: 'var(--accent)', flexShrink: 0 }}>
-              {getInitials(user?.name || 'U')}
-            </div>
+            {user?.avatar ? (
+              <img src={user.avatar} alt="User" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+            ) : (
+              <div className="avatar" style={{ background: 'var(--accent)', flexShrink: 0 }}>
+                {getInitials(user?.name || 'U')}
+              </div>
+            )}
             {!collapsed && (
               <div style={{ flex: 1, overflow: 'hidden' }}>
                 <div style={{ fontWeight: 600, fontSize: '0.8rem', color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -279,7 +314,7 @@ export default function AppLayout() {
               value={search}
               onChange={e => setSearch(e.target.value)}
               onFocus={() => { if (search.trim().length >= 2) setShowSearchDrop(true); }}
-              placeholder="Search tasks or projects..."
+              placeholder="Search tasks or projects... (⌘K)"
               id="global-search"
             />
             {search && (
@@ -395,13 +430,22 @@ export default function AppLayout() {
               )}
             </button>
 
-            <div
-              className="avatar avatar-lg"
-              style={{ cursor: 'pointer' }}
-              onClick={() => navigate('/settings')}
-            >
-              {getInitials(user?.name || 'U')}
-            </div>
+            {user?.avatar ? (
+              <img
+                src={user.avatar}
+                alt="Profile"
+                style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', cursor: 'pointer' }}
+                onClick={() => navigate('/settings')}
+              />
+            ) : (
+              <div
+                className="avatar avatar-lg"
+                style={{ cursor: 'pointer' }}
+                onClick={() => navigate('/settings')}
+              >
+                {getInitials(user?.name || 'U')}
+              </div>
+            )}
           </div>
         </header>
 

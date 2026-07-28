@@ -69,7 +69,22 @@ const getProjects = async (req, res) => {
       .populate('members', 'name email role')
       .sort({ createdAt: -1 });
 
-    res.json({ success: true, projects });
+    const projectsWithProgress = await Promise.all(
+      projects.map(async (p) => {
+        const tasks = await Task.find({ projectId: p._id });
+        const total = tasks.length;
+        const completed = tasks.filter(t => t.status === 'completed').length;
+        const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+        return {
+          ...p.toObject(),
+          progress,
+          totalTasks: total,
+          completedTasks: completed,
+        };
+      })
+    );
+
+    res.json({ success: true, projects: projectsWithProgress });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
