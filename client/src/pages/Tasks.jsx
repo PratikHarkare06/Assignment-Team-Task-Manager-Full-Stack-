@@ -1,15 +1,15 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import ReactDOM from 'react-dom';
 import { fetchTasks, createTask, updateTask, deleteTask } from '../redux/slices/tasksSlice';
 import { fetchProjects } from '../redux/slices/projectsSlice';
-import { Plus, Search, Download, MoreHorizontal, Trash2, CheckCircle } from 'lucide-react';
+import { Plus, Search, Download, MoreHorizontal, Trash2, CheckCircle, LayoutList, LayoutGrid } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
+import TaskDrawer from '../components/TaskDrawer';
+import KanbanBoard from '../components/KanbanBoard';
 
-/* ── Smart Portal Menu ───────────────────────────────────────────────────────
-   Renders into document.body. Flips above the button if not enough space below.
-*/
+/* ── Smart Portal Menu ─────────────────────────────────────────────────────── */
 function SmartMenu({ anchorRef, onClose, children }) {
   const [style, setStyle] = useState({ visibility: 'hidden' });
   const menuRef = useRef(null);
@@ -38,7 +38,6 @@ function SmartMenu({ anchorRef, onClose, children }) {
       zIndex:       9999,
     });
 
-    // Use capture-phase 'click' so menu item onClick fires before we close
     const handleOutside = (e) => {
       const insideBtn  = btn  && btn.contains(e.target);
       const insideMenu = menu && menu.contains(e.target);
@@ -54,7 +53,7 @@ function SmartMenu({ anchorRef, onClose, children }) {
   );
 }
 
-const STATUSES = ['Todo', 'In Progress', 'Completed', 'Blocked'];
+const STATUSES   = ['Todo', 'In Progress', 'Completed', 'Blocked'];
 const PRIORITIES = ['High', 'Medium', 'Low'];
 
 function getStatusBadge(s) {
@@ -65,7 +64,7 @@ function getStatusBadge(s) {
 }
 
 function getPriorityDot(p) {
-  const cls = p === 'High' ? 'dot-red' : p === 'Medium' ? 'dot-yellow' : 'dot-green';
+  const cls = p === 'High' || p === 'high' ? 'dot-red' : (p === 'Medium' || p === 'medium') ? 'dot-yellow' : 'dot-green';
   return <span className={`dot ${cls}`} />;
 }
 
@@ -74,20 +73,21 @@ const COLORS = ['#6366F1', '#22C55E', '#F59E0B', '#E5484D', '#8B5CF6'];
 export default function Tasks() {
   const dispatch = useDispatch();
   const { list: tasks, loading } = useSelector(s => s.tasks);
-  const { list: projects } = useSelector(s => s.projects);
-  const { user } = useSelector(s => s.auth);
+  const { list: projects }       = useSelector(s => s.projects);
+  const { user }                  = useSelector(s => s.auth);
   const isAdmin = user?.role === 'admin';
 
-  const [view, setView] = useState('table');
-  const [search, setSearch] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
+  const [view, setView]                   = useState('table'); // 'table' | 'board'
+  const [search, setSearch]               = useState('');
+  const [filterStatus, setFilterStatus]   = useState('');
   const [filterPriority, setFilterPriority] = useState('');
-  const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ title: '', description: '', priority: 'Medium', status: 'Todo', dueDate: '', projectId: '', assignedTo: '' });
-  const [creating, setCreating] = useState(false);
-  const [menuId, setMenuId]         = useState(null);
-  const [users, setUsers] = useState([]);
-  const menuBtnRefs                  = useRef({});
+  const [showModal, setShowModal]         = useState(false);
+  const [form, setForm]                   = useState({ title: '', description: '', priority: 'Medium', status: 'Todo', dueDate: '', projectId: '', assignedTo: '' });
+  const [creating, setCreating]           = useState(false);
+  const [menuId, setMenuId]               = useState(null);
+  const [users, setUsers]                 = useState([]);
+  const [drawerTaskId, setDrawerTaskId]   = useState(null);
+  const menuBtnRefs                        = useRef({});
 
   useEffect(() => {
     dispatch(fetchTasks());
@@ -98,9 +98,9 @@ export default function Tasks() {
   }, [dispatch]);
 
   const filtered = (tasks || []).filter(t => {
-    const matchSearch = t.title?.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = !filterStatus || t.status?.toLowerCase() === filterStatus.toLowerCase();
-    const matchPriority = !filterPriority || t.priority === filterPriority;
+    const matchSearch   = t.title?.toLowerCase().includes(search.toLowerCase());
+    const matchStatus   = !filterStatus   || t.status?.toLowerCase() === filterStatus.toLowerCase();
+    const matchPriority = !filterPriority || t.priority?.toLowerCase() === filterPriority.toLowerCase();
     return matchSearch && matchStatus && matchPriority;
   });
 
@@ -123,8 +123,7 @@ export default function Tasks() {
   };
 
   const handleDelete = async (id) => {
-    // Use toast confirm instead of window.confirm so it doesn't block the event chain
-    const tid = toast(
+    toast(
       (t) => (
         <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           Delete this task?
@@ -151,7 +150,7 @@ export default function Tasks() {
   const exportCSV = () => {
     const rows = [['Task ID', 'Task Name', 'Status', 'Priority', 'Due Date']];
     filtered.forEach((t, i) => rows.push([`T-${i + 101}`, t.title, t.status, t.priority, t.dueDate || '—']));
-    const csv = rows.map(r => r.join(',')).join('\n');
+    const csv  = rows.map(r => r.join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'tasks.csv'; a.click();
   };
@@ -174,7 +173,7 @@ export default function Tasks() {
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Filters + View Toggle */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
         <select className="form-select" style={{ width: 140 }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
           <option value="">Status ▾</option>
@@ -189,103 +188,165 @@ export default function Tasks() {
           <input placeholder="Search tasks, IDs, or members..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <span style={{ fontSize: '0.8rem', color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
-          Showing {filtered.length} tasks
+          {view === 'table' ? `Showing ${filtered.length} tasks` : `${tasks.length} tasks`}
         </span>
+
+        {/* View toggle */}
+        <div style={{
+          display: 'flex', background: 'var(--bg)',
+          border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden',
+        }}>
+          <button
+            onClick={() => setView('table')}
+            title="Table view"
+            style={{
+              padding: '6px 12px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+              background: view === 'table' ? 'var(--accent)' : 'transparent',
+              color: view === 'table' ? 'white' : 'var(--text-2)',
+              fontSize: '0.8rem', fontWeight: 600, transition: 'background 0.15s',
+            }}
+          >
+            <LayoutList size={14} /> List
+          </button>
+          <button
+            onClick={() => setView('board')}
+            title="Kanban board"
+            style={{
+              padding: '6px 12px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+              background: view === 'board' ? 'var(--accent)' : 'transparent',
+              color: view === 'board' ? 'white' : 'var(--text-2)',
+              fontSize: '0.8rem', fontWeight: 600, transition: 'background 0.15s',
+            }}
+          >
+            <LayoutGrid size={14} /> Board
+          </button>
+        </div>
       </div>
 
-      {/* Table */}
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        {loading ? (
-          <div style={{ padding: 40, textAlign: 'center' }}><div className="spinner" style={{ margin: '0 auto' }} /></div>
-        ) : filtered.length === 0 ? (
-          <div className="empty-state">
-            <CheckCircle size={36} style={{ margin: '0 auto' }} />
-            <h3>No tasks found</h3>
-            <p>Try adjusting your filters or create a new task.</p>
-          </div>
-        ) : (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>TASK ID ↕</th>
-                <th>TASK NAME ↕</th>
-                <th>STATUS ↕</th>
-                <th>PRIORITY ↕</th>
-                <th>ASSIGNEE</th>
-                <th>DUE DATE ↕</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((task, i) => {
-                const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'Completed';
-                return (
-                  <tr key={task._id}>
-                    <td style={{ color: 'var(--text-3)', fontSize: '0.8rem', fontFamily: 'var(--font-mono)' }}>T-{101 + i}</td>
-                    <td style={{ fontWeight: 500, maxWidth: 220 }}>
-                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</div>
-                    </td>
-                    <td>{getStatusBadge(task.status)}</td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        {getPriorityDot(task.priority)}
-                        <span style={{ fontSize: '0.83rem' }}>{task.priority}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div className="avatar avatar-sm" style={{ background: COLORS[i % COLORS.length], fontSize: '0.6rem' }}>
-                          {(task.assignedTo?.name || task.assignedTo?.email || 'U').slice(0, 2).toUpperCase()}
-                        </div>
-                        <span style={{ fontSize: '0.83rem' }}>{task.assignedTo?.name || 'Unassigned'}</span>
-                      </div>
-                    </td>
-                    <td className={isOverdue ? 'overdue' : ''} style={{ fontSize: '0.83rem' }}>
-                      {task.dueDate ? new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
-                    </td>
-                    <td>
-                      <div style={{ position: 'relative' }}>
-                        <button
-                          ref={el => { menuBtnRefs.current[task._id] = el; }}
-                          className="btn btn-ghost btn-sm"
-                          style={{ padding: '4px 6px' }}
-                          onClick={() => setMenuId(menuId === task._id ? null : task._id)}
-                        >
-                          <MoreHorizontal size={15} />
-                        </button>
-                        {menuId === task._id && (
-                          <SmartMenu
-                            anchorRef={{ current: menuBtnRefs.current[task._id] }}
-                            onClose={() => setMenuId(null)}
-                          >
-                            {STATUSES.map(s => (
-                              <button
-                                key={s}
-                                className="dropdown-item"
-                                onClick={() => { setMenuId(null); handleStatusChange(task, s); }}
-                              >
-                                → {s}
-                              </button>
-                            ))}
-                            {isAdmin && (
-                              <button
-                                className="dropdown-item danger"
-                                onClick={() => { setMenuId(null); handleDelete(task._id); }}
-                              >
-                                <Trash2 size={12} /> Delete
-                              </button>
-                            )}
-                          </SmartMenu>
+      {/* ── Board View ── */}
+      {view === 'board' && (
+        <KanbanBoard onTaskClick={id => setDrawerTaskId(id)} />
+      )}
+
+      {/* ── Table View ── */}
+      {view === 'table' && (
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          {loading ? (
+            <div style={{ padding: 40, textAlign: 'center' }}><div className="spinner" style={{ margin: '0 auto' }} /></div>
+          ) : filtered.length === 0 ? (
+            <div className="empty-state">
+              <CheckCircle size={36} style={{ margin: '0 auto' }} />
+              <h3>No tasks found</h3>
+              <p>Try adjusting your filters or create a new task.</p>
+            </div>
+          ) : (
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>TASK ID ↕</th>
+                  <th>TASK NAME ↕</th>
+                  <th>STATUS ↕</th>
+                  <th>PRIORITY ↕</th>
+                  <th>ASSIGNEE</th>
+                  <th>DUE DATE ↕</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((task, i) => {
+                  const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'Completed' && task.status !== 'completed';
+                  return (
+                    <tr
+                      key={task._id}
+                      onClick={(e) => {
+                        // Don't open drawer if clicking the action menu
+                        if (e.target.closest('button')) return;
+                        setDrawerTaskId(task._id);
+                      }}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <td style={{ color: 'var(--text-3)', fontSize: '0.8rem', fontFamily: 'var(--font-mono)' }}>T-{101 + i}</td>
+                      <td style={{ fontWeight: 500, maxWidth: 220 }}>
+                        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</div>
+                        {task.comments?.length > 0 && (
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-3)', marginTop: 2 }}>
+                            💬 {task.comments.length} comment{task.comments.length !== 1 ? 's' : ''}
+                          </div>
                         )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
+                      </td>
+                      <td>{getStatusBadge(task.status)}</td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {getPriorityDot(task.priority)}
+                          <span style={{ fontSize: '0.83rem', textTransform: 'capitalize' }}>{task.priority}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div className="avatar avatar-sm" style={{ background: COLORS[i % COLORS.length], fontSize: '0.6rem' }}>
+                            {(task.assignedTo?.name || task.assignedTo?.email || 'U').slice(0, 2).toUpperCase()}
+                          </div>
+                          <span style={{ fontSize: '0.83rem' }}>{task.assignedTo?.name || 'Unassigned'}</span>
+                        </div>
+                      </td>
+                      <td className={isOverdue ? 'overdue' : ''} style={{ fontSize: '0.83rem' }}>
+                        {task.dueDate ? new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                      </td>
+                      <td>
+                        <div style={{ position: 'relative' }}>
+                          <button
+                            ref={el => { menuBtnRefs.current[task._id] = el; }}
+                            className="btn btn-ghost btn-sm"
+                            style={{ padding: '4px 6px' }}
+                            onClick={e => { e.stopPropagation(); setMenuId(menuId === task._id ? null : task._id); }}
+                          >
+                            <MoreHorizontal size={15} />
+                          </button>
+                          {menuId === task._id && (
+                            <SmartMenu
+                              anchorRef={{ current: menuBtnRefs.current[task._id] }}
+                              onClose={() => setMenuId(null)}
+                            >
+                              <button className="dropdown-item" onClick={() => { setMenuId(null); setDrawerTaskId(task._id); }}>
+                                📋 View Details
+                              </button>
+                              {STATUSES.map(s => (
+                                <button
+                                  key={s}
+                                  className="dropdown-item"
+                                  onClick={() => { setMenuId(null); handleStatusChange(task, s); }}
+                                >
+                                  → {s}
+                                </button>
+                              ))}
+                              {isAdmin && (
+                                <button
+                                  className="dropdown-item danger"
+                                  onClick={() => { setMenuId(null); handleDelete(task._id); }}
+                                >
+                                  <Trash2 size={12} /> Delete
+                                </button>
+                              )}
+                            </SmartMenu>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {/* Task Detail Drawer */}
+      {drawerTaskId && (
+        <TaskDrawer
+          taskId={drawerTaskId}
+          onClose={() => setDrawerTaskId(null)}
+        />
+      )}
 
       {/* Create Task Modal */}
       {showModal && (

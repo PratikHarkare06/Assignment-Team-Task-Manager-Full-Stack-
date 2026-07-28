@@ -1,9 +1,9 @@
+import { useState, useEffect } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { io } from 'socket.io-client';
 import toast from 'react-hot-toast';
 import api from '../services/api';
-import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '../redux/slices/authSlice';
 import {
   LayoutDashboard, FolderOpen, CheckSquare, Users,

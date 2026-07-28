@@ -1,5 +1,22 @@
 const mongoose = require('mongoose');
 
+const commentSchema = new mongoose.Schema(
+  {
+    author: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
+    body: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: [2000, 'Comment cannot exceed 2000 characters'],
+    },
+  },
+  { timestamps: true }
+);
+
 const taskSchema = new mongoose.Schema(
   {
     title: {
@@ -42,6 +59,11 @@ const taskSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
+    },
+    comments: [commentSchema],
+    reminderSent: {
+      type: Boolean,
+      default: false,
     },
   },
   { timestamps: true }

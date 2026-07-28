@@ -1,5 +1,6 @@
 const Task = require('../models/Task');
 const Project = require('../models/Project');
+const User = require('../models/User');
 
 // @desc    Get dashboard statistics
 // @route   GET /api/dashboard/stats
@@ -8,7 +9,6 @@ const getStats = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    // Get all projects the user is part of
     const projects = await Project.find({
       $or: [{ createdBy: userId }, { members: userId }],
     });
@@ -32,7 +32,6 @@ const getStats = async (req, res) => {
       (t) => t.dueDate && new Date(t.dueDate) < now && t.status !== 'completed'
     ).length;
 
-    // My assigned tasks
     const myTasks = tasks.filter(
       (t) => t.assignedTo && t.assignedTo.toString() === userId.toString()
     ).length;
@@ -116,4 +115,60 @@ const getChartData = async (req, res) => {
   }
 };
 
-module.exports = { getStats, getOverdueTasks, getChartData };
+// @desc    Get per-member task stats for Team Performance widget
+// @route   GET /api/dashboard/member-stats
+// @access  Private
+const getMemberStats = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    // Get all projects the current user is part of
+    const projects = await Project.find({
+      $or: [{ createdBy: userId }, { members: userId }],
+    }).populate('members', 'name email');
+
+    const projectIds = projects.map((p) => p._id);
+
+    // Collect unique members across all projects
+    const memberMap = {};
+    projects.forEach((p) => {
+      (p.members || []).forEach((m) => {
+        memberMap[m._id.toString()] = m;
+      });
+    });
+
+    const memberIds = Object.keys(memberMap);
+    if (memberIds.length === 0) return res.json({ success: true, members: [] });
+
+    // For each member, count their tasks in these projects
+    const memberStats = await Promise.all(
+      memberIds.map(async (memberId) => {
+        const member = memberMap[memberId];
+        const allTasks = await Task.find({
+          projectId: { $in: projectIds },
+          assignedTo: memberId,
+        });
+        const completedCount = allTasks.filter((t) => t.status === 'completed').length;
+        const total = allTasks.length;
+        const completionRate = total > 0 ? Math.round((completedCount / total) * 100) : 0;
+        return {
+          _id: memberId,
+          name: member.name,
+          email: member.email,
+          total,
+          completed: completedCount,
+          completionRate,
+        };
+      })
+    );
+
+    // Sort by completion rate descending
+    memberStats.sort((a, b) => b.completionRate - a.completionRate);
+
+    res.json({ success: true, members: memberStats.slice(0, 5) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports = { getStats, getOverdueTasks, getChartData, getMemberStats };

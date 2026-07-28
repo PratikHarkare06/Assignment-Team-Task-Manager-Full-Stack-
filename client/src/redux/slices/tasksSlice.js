@@ -37,11 +37,39 @@ export const deleteTask = createAsyncThunk('tasks/delete', async (id, { rejectWi
   }
 });
 
+export const addComment = createAsyncThunk('tasks/addComment', async ({ taskId, body }, { rejectWithValue }) => {
+  try {
+    const res = await api.post(`/tasks/${taskId}/comments`, { body });
+    return { taskId, comment: res.data.comment };
+  } catch (err) {
+    return rejectWithValue(err.response?.data?.message || 'Failed to add comment');
+  }
+});
+
+export const deleteComment = createAsyncThunk('tasks/deleteComment', async ({ taskId, commentId }, { rejectWithValue }) => {
+  try {
+    await api.delete(`/tasks/${taskId}/comments/${commentId}`);
+    return { taskId, commentId };
+  } catch (err) {
+    return rejectWithValue(err.response?.data?.message || 'Failed to delete comment');
+  }
+});
+
 const tasksSlice = createSlice({
   name: 'tasks',
   initialState: { list: [], loading: false, error: null },
   reducers: {
     clearError(state) { state.error = null; },
+    // Optimistic real-time comment push (from socket)
+    pushComment(state, action) {
+      const { taskId, comment } = action.payload;
+      const task = state.list.find(t => t._id === taskId);
+      if (task) {
+        if (!task.comments) task.comments = [];
+        const exists = task.comments.find(c => c._id === comment._id);
+        if (!exists) task.comments.push(comment);
+      }
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -58,9 +86,26 @@ const tasksSlice = createSlice({
 
       .addCase(deleteTask.fulfilled, (state, a) => {
         state.list = state.list.filter((t) => t._id !== a.payload);
+      })
+
+      .addCase(addComment.fulfilled, (state, a) => {
+        const { taskId, comment } = a.payload;
+        const task = state.list.find(t => t._id === taskId);
+        if (task) {
+          if (!task.comments) task.comments = [];
+          task.comments.push(comment);
+        }
+      })
+
+      .addCase(deleteComment.fulfilled, (state, a) => {
+        const { taskId, commentId } = a.payload;
+        const task = state.list.find(t => t._id === taskId);
+        if (task && task.comments) {
+          task.comments = task.comments.filter(c => c._id !== commentId);
+        }
       });
   },
 });
 
-export const { clearError } = tasksSlice.actions;
+export const { clearError, pushComment } = tasksSlice.actions;
 export default tasksSlice.reducer;

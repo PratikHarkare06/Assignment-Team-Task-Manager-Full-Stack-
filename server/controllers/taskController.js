@@ -88,7 +88,7 @@ const getTasks = async (req, res) => {
   }
 };
 
-// @desc    Get single task
+// @desc    Get single task (with comments populated)
 // @route   GET /api/tasks/:id
 // @access  Private
 const getTask = async (req, res) => {
@@ -96,7 +96,8 @@ const getTask = async (req, res) => {
     const task = await Task.findById(req.params.id)
       .populate('assignedTo', 'name email')
       .populate('createdBy', 'name email')
-      .populate('projectId', 'title');
+      .populate('projectId', 'title')
+      .populate('comments.author', 'name email');
 
     if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
     res.json({ success: true, task });
@@ -214,4 +215,87 @@ const deleteTask = async (req, res) => {
   }
 };
 
-module.exports = { createTask, getTasks, getTask, updateTask, deleteTask };
+// @desc    Add comment to task
+// @route   POST /api/tasks/:id/comments
+// @access  Private
+const addComment = async (req, res) => {
+  try {
+    const { body } = req.body;
+    if (!body || !body.trim()) {
+      return res.status(400).json({ success: false, message: 'Comment body is required' });
+    }
+
+    const task = await Task.findById(req.params.id).populate('projectId', 'title members');
+    if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
+
+    const comment = { author: req.user._id, body: body.trim() };
+    task.comments.push(comment);
+    await task.save();
+
+    // Populate the new comment's author
+    await task.populate('comments.author', 'name email');
+    const newComment = task.comments[task.comments.length - 1];
+
+    // Emit real-time comment to project members
+    try {
+      const io = req.app.get('io');
+      const project = task.projectId;
+      if (io && project) {
+        const membersToNotify = (project.members || []).filter(
+          m => m.toString() !== req.user._id.toString()
+        );
+        io.emit(`task_comment_${task._id}`, newComment);
+
+        // Notify assignee if different from commenter
+        if (task.assignedTo && task.assignedTo.toString() !== req.user._id.toString()) {
+          const notif = await Notification.create({
+            recipient: task.assignedTo,
+            type: 'mention',
+            title: 'New comment on your task',
+            body: `${req.user.name} commented on '${task.title}': "${body.slice(0, 80)}${body.length > 80 ? '…' : ''}"`,
+            tag: `Task: ${task.title}`,
+            relatedId: task._id,
+          });
+          io.to(task.assignedTo.toString()).emit('new_notification', {
+            title: notif.title,
+            body: notif.body,
+            type: 'mention',
+          });
+        }
+      }
+    } catch (emitErr) {
+      console.error('Failed to emit comment', emitErr);
+    }
+
+    res.status(201).json({ success: true, comment: newComment });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Delete comment from task
+// @route   DELETE /api/tasks/:id/comments/:commentId
+// @access  Private
+const deleteComment = async (req, res) => {
+  try {
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
+
+    const comment = task.comments.id(req.params.commentId);
+    if (!comment) return res.status(404).json({ success: false, message: 'Comment not found' });
+
+    const isAuthor = comment.author.toString() === req.user._id.toString();
+    if (!isAuthor && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Not authorized to delete this comment' });
+    }
+
+    comment.deleteOne();
+    await task.save();
+
+    res.json({ success: true, message: 'Comment deleted' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports = { createTask, getTasks, getTask, updateTask, deleteTask, addComment, deleteComment };
