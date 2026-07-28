@@ -102,6 +102,7 @@ app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/notifications', require('./routes/notifications'));
+app.use('/api/search', require('./routes/search'));
 
 // Health check
 app.get('/health', (req, res) => {

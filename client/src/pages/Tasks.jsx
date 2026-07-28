@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import ReactDOM from 'react-dom';
 import { fetchTasks, createTask, updateTask, deleteTask } from '../redux/slices/tasksSlice';
 import { fetchProjects } from '../redux/slices/projectsSlice';
-import { Plus, Search, Download, MoreHorizontal, Trash2, CheckCircle, LayoutList, LayoutGrid } from 'lucide-react';
+import { Plus, Search, Download, MoreHorizontal, Trash2, CheckCircle, LayoutList, LayoutGrid, ChevronLeft, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 import TaskDrawer from '../components/TaskDrawer';
@@ -56,6 +56,9 @@ function SmartMenu({ anchorRef, onClose, children }) {
 const STATUSES   = ['Todo', 'In Progress', 'Completed', 'Blocked'];
 const PRIORITIES = ['High', 'Medium', 'Low'];
 
+const PRIORITY_WEIGHTS = { critical: 4, high: 3, medium: 2, low: 1 };
+const STATUS_WEIGHTS = { todo: 1, 'in-progress': 2, blocked: 3, completed: 4 };
+
 function getStatusBadge(s) {
   if (!s) return null;
   const map = { 'todo': 'badge-gray', 'in progress': 'badge-blue', 'completed': 'badge-green', 'blocked': 'badge-red', 'in-progress': 'badge-blue' };
@@ -81,6 +84,11 @@ export default function Tasks() {
   const [search, setSearch]               = useState('');
   const [filterStatus, setFilterStatus]   = useState('');
   const [filterPriority, setFilterPriority] = useState('');
+  const [sortField, setSortField]         = useState('createdAt');
+  const [sortOrder, setSortOrder]         = useState('desc');
+  const [currentPage, setCurrentPage]     = useState(1);
+  const pageSize = 10;
+
   const [showModal, setShowModal]         = useState(false);
   const [form, setForm]                   = useState({ title: '', description: '', priority: 'Medium', status: 'Todo', dueDate: '', projectId: '', assignedTo: '' });
   const [creating, setCreating]           = useState(false);
@@ -97,12 +105,58 @@ export default function Tasks() {
     }).catch(() => {});
   }, [dispatch]);
 
+  // Handle Sort Toggle
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortOrder('asc');
+    }
+    setCurrentPage(1);
+  };
+
+  const getSortIcon = (field) => {
+    if (sortField !== field) return ' ↕';
+    return sortOrder === 'asc' ? ' ↑' : ' ↓';
+  };
+
+  // Filter
   const filtered = (tasks || []).filter(t => {
     const matchSearch   = t.title?.toLowerCase().includes(search.toLowerCase());
     const matchStatus   = !filterStatus   || t.status?.toLowerCase() === filterStatus.toLowerCase();
     const matchPriority = !filterPriority || t.priority?.toLowerCase() === filterPriority.toLowerCase();
     return matchSearch && matchStatus && matchPriority;
   });
+
+  // Sort
+  const sorted = [...filtered].sort((a, b) => {
+    let valA, valB;
+    if (sortField === 'title') {
+      valA = a.title?.toLowerCase() || '';
+      valB = b.title?.toLowerCase() || '';
+    } else if (sortField === 'status') {
+      valA = STATUS_WEIGHTS[a.status?.toLowerCase()] || 0;
+      valB = STATUS_WEIGHTS[b.status?.toLowerCase()] || 0;
+    } else if (sortField === 'priority') {
+      valA = PRIORITY_WEIGHTS[a.priority?.toLowerCase()] || 0;
+      valB = PRIORITY_WEIGHTS[b.priority?.toLowerCase()] || 0;
+    } else if (sortField === 'dueDate') {
+      valA = a.dueDate ? new Date(a.dueDate).getTime() : 0;
+      valB = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+    } else { // createdAt
+      valA = new Date(a.createdAt || 0).getTime();
+      valB = new Date(b.createdAt || 0).getTime();
+    }
+
+    if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+    if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  // Paginate
+  const totalPages = Math.ceil(sorted.length / pageSize) || 1;
+  const paginatedTasks = sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -149,7 +203,7 @@ export default function Tasks() {
 
   const exportCSV = () => {
     const rows = [['Task ID', 'Task Name', 'Status', 'Priority', 'Due Date']];
-    filtered.forEach((t, i) => rows.push([`T-${i + 101}`, t.title, t.status, t.priority, t.dueDate || '—']));
+    sorted.forEach((t, i) => rows.push([`T-${i + 101}`, t.title, t.status, t.priority, t.dueDate || '—']));
     const csv  = rows.map(r => r.join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'tasks.csv'; a.click();
@@ -175,20 +229,20 @@ export default function Tasks() {
 
       {/* Filters + View Toggle */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
-        <select className="form-select" style={{ width: 140 }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+        <select className="form-select" style={{ width: 140 }} value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setCurrentPage(1); }}>
           <option value="">Status ▾</option>
           {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
-        <select className="form-select" style={{ width: 140 }} value={filterPriority} onChange={e => setFilterPriority(e.target.value)}>
+        <select className="form-select" style={{ width: 140 }} value={filterPriority} onChange={e => { setFilterPriority(e.target.value); setCurrentPage(1); }}>
           <option value="">Priority ▾</option>
           {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
         </select>
         <div className="search-box" style={{ flex: 1 }}>
           <Search size={14} />
-          <input placeholder="Search tasks, IDs, or members..." value={search} onChange={e => setSearch(e.target.value)} />
+          <input placeholder="Search tasks, IDs, or members..." value={search} onChange={e => { setSearch(e.target.value); setCurrentPage(1); }} />
         </div>
         <span style={{ fontSize: '0.8rem', color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
-          {view === 'table' ? `Showing ${filtered.length} tasks` : `${tasks.length} tasks`}
+          {view === 'table' ? `Showing ${paginatedTasks.length} of ${sorted.length} tasks` : `${tasks.length} tasks`}
         </span>
 
         {/* View toggle */}
@@ -233,109 +287,149 @@ export default function Tasks() {
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
           {loading ? (
             <div style={{ padding: 40, textAlign: 'center' }}><div className="spinner" style={{ margin: '0 auto' }} /></div>
-          ) : filtered.length === 0 ? (
+          ) : sorted.length === 0 ? (
             <div className="empty-state">
               <CheckCircle size={36} style={{ margin: '0 auto' }} />
               <h3>No tasks found</h3>
               <p>Try adjusting your filters or create a new task.</p>
             </div>
           ) : (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>TASK ID ↕</th>
-                  <th>TASK NAME ↕</th>
-                  <th>STATUS ↕</th>
-                  <th>PRIORITY ↕</th>
-                  <th>ASSIGNEE</th>
-                  <th>DUE DATE ↕</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((task, i) => {
-                  const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'Completed' && task.status !== 'completed';
-                  return (
-                    <tr
-                      key={task._id}
-                      onClick={(e) => {
-                        // Don't open drawer if clicking the action menu
-                        if (e.target.closest('button')) return;
-                        setDrawerTaskId(task._id);
-                      }}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <td style={{ color: 'var(--text-3)', fontSize: '0.8rem', fontFamily: 'var(--font-mono)' }}>T-{101 + i}</td>
-                      <td style={{ fontWeight: 500, maxWidth: 220 }}>
-                        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</div>
-                        {task.comments?.length > 0 && (
-                          <div style={{ fontSize: '0.7rem', color: 'var(--text-3)', marginTop: 2 }}>
-                            💬 {task.comments.length} comment{task.comments.length !== 1 ? 's' : ''}
-                          </div>
-                        )}
-                      </td>
-                      <td>{getStatusBadge(task.status)}</td>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          {getPriorityDot(task.priority)}
-                          <span style={{ fontSize: '0.83rem', textTransform: 'capitalize' }}>{task.priority}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <div className="avatar avatar-sm" style={{ background: COLORS[i % COLORS.length], fontSize: '0.6rem' }}>
-                            {(task.assignedTo?.name || task.assignedTo?.email || 'U').slice(0, 2).toUpperCase()}
-                          </div>
-                          <span style={{ fontSize: '0.83rem' }}>{task.assignedTo?.name || 'Unassigned'}</span>
-                        </div>
-                      </td>
-                      <td className={isOverdue ? 'overdue' : ''} style={{ fontSize: '0.83rem' }}>
-                        {task.dueDate ? new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
-                      </td>
-                      <td>
-                        <div style={{ position: 'relative' }}>
-                          <button
-                            ref={el => { menuBtnRefs.current[task._id] = el; }}
-                            className="btn btn-ghost btn-sm"
-                            style={{ padding: '4px 6px' }}
-                            onClick={e => { e.stopPropagation(); setMenuId(menuId === task._id ? null : task._id); }}
-                          >
-                            <MoreHorizontal size={15} />
-                          </button>
-                          {menuId === task._id && (
-                            <SmartMenu
-                              anchorRef={{ current: menuBtnRefs.current[task._id] }}
-                              onClose={() => setMenuId(null)}
-                            >
-                              <button className="dropdown-item" onClick={() => { setMenuId(null); setDrawerTaskId(task._id); }}>
-                                📋 View Details
-                              </button>
-                              {STATUSES.map(s => (
-                                <button
-                                  key={s}
-                                  className="dropdown-item"
-                                  onClick={() => { setMenuId(null); handleStatusChange(task, s); }}
-                                >
-                                  → {s}
-                                </button>
-                              ))}
-                              {isAdmin && (
-                                <button
-                                  className="dropdown-item danger"
-                                  onClick={() => { setMenuId(null); handleDelete(task._id); }}
-                                >
-                                  <Trash2 size={12} /> Delete
-                                </button>
-                              )}
-                            </SmartMenu>
+            <>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th style={{ cursor: 'pointer' }} onClick={() => handleSort('createdAt')}>TASK ID{getSortIcon('createdAt')}</th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => handleSort('title')}>TASK NAME{getSortIcon('title')}</th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => handleSort('status')}>STATUS{getSortIcon('status')}</th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => handleSort('priority')}>PRIORITY{getSortIcon('priority')}</th>
+                    <th>ASSIGNEE</th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => handleSort('dueDate')}>DUE DATE{getSortIcon('dueDate')}</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedTasks.map((task, i) => {
+                    const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'Completed' && task.status !== 'completed';
+                    const displayIndex = (currentPage - 1) * pageSize + i + 1;
+                    return (
+                      <tr
+                        key={task._id}
+                        onClick={(e) => {
+                          if (e.target.closest('button')) return;
+                          setDrawerTaskId(task._id);
+                        }}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <td style={{ color: 'var(--text-3)', fontSize: '0.8rem', fontFamily: 'var(--font-mono)' }}>T-{100 + displayIndex}</td>
+                        <td style={{ fontWeight: 500, maxWidth: 220 }}>
+                          <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</div>
+                          {task.comments?.length > 0 && (
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-3)', marginTop: 2 }}>
+                              💬 {task.comments.length} comment{task.comments.length !== 1 ? 's' : ''}
+                            </div>
                           )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        </td>
+                        <td>{getStatusBadge(task.status)}</td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            {getPriorityDot(task.priority)}
+                            <span style={{ fontSize: '0.83rem', textTransform: 'capitalize' }}>{task.priority}</span>
+                          </div>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div className="avatar avatar-sm" style={{ background: COLORS[i % COLORS.length], fontSize: '0.6rem' }}>
+                              {(task.assignedTo?.name || task.assignedTo?.email || 'U').slice(0, 2).toUpperCase()}
+                            </div>
+                            <span style={{ fontSize: '0.83rem' }}>{task.assignedTo?.name || 'Unassigned'}</span>
+                          </div>
+                        </td>
+                        <td className={isOverdue ? 'overdue' : ''} style={{ fontSize: '0.83rem' }}>
+                          {task.dueDate ? new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                        </td>
+                        <td>
+                          <div style={{ position: 'relative' }}>
+                            <button
+                              ref={el => { menuBtnRefs.current[task._id] = el; }}
+                              className="btn btn-ghost btn-sm"
+                              style={{ padding: '4px 6px' }}
+                              onClick={e => { e.stopPropagation(); setMenuId(menuId === task._id ? null : task._id); }}
+                            >
+                              <MoreHorizontal size={15} />
+                            </button>
+                            {menuId === task._id && (
+                              <SmartMenu
+                                anchorRef={{ current: menuBtnRefs.current[task._id] }}
+                                onClose={() => setMenuId(null)}
+                              >
+                                <button className="dropdown-item" onClick={() => { setMenuId(null); setDrawerTaskId(task._id); }}>
+                                  📋 View Details
+                                </button>
+                                {STATUSES.map(s => (
+                                  <button
+                                    key={s}
+                                    className="dropdown-item"
+                                    onClick={() => { setMenuId(null); handleStatusChange(task, s); }}
+                                  >
+                                    → {s}
+                                  </button>
+                                ))}
+                                {isAdmin && (
+                                  <button
+                                    className="dropdown-item danger"
+                                    onClick={() => { setMenuId(null); handleDelete(task._id); }}
+                                  >
+                                    <Trash2 size={12} /> Delete
+                                  </button>
+                                )}
+                              </SmartMenu>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '12px 16px', borderTop: '1px solid var(--border)',
+                }}>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-3)' }}>
+                    Page {currentPage} of {totalPages}
+                  </div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    >
+                      <ChevronLeft size={14} /> Prev
+                    </button>
+                    {Array.from({ length: totalPages }, (_, idx) => (
+                      <button
+                        key={idx + 1}
+                        className={`btn btn-sm ${currentPage === idx + 1 ? 'btn-primary' : 'btn-ghost'}`}
+                        onClick={() => setCurrentPage(idx + 1)}
+                        style={{ minWidth: 28, padding: '2px 8px' }}
+                      >
+                        {idx + 1}
+                      </button>
+                    ))}
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      disabled={currentPage === totalPages}
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    >
+                      Next <ChevronRight size={14} />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

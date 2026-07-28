@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { updateTask } from '../redux/slices/tasksSlice';
 import CommentsThread from './CommentsThread';
+import AttachmentsPanel from './AttachmentsPanel';
+import ActivityLog from './ActivityLog';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import {
@@ -49,6 +51,9 @@ export default function TaskDrawer({ taskId, onClose }) {
   const [editingDesc, setEditingDesc] = useState(false);
   const [descDraft, setDescDraft] = useState('');
   const [saving, setSaving] = useState(false);
+  // Local attachment + activity state (populated from full GET)
+  const [attachments, setAttachments]   = useState([]);
+  const [activityLog, setActivityLog]   = useState([]);
 
   // Fetch full task detail (with comments populated)
   useEffect(() => {
@@ -56,7 +61,11 @@ export default function TaskDrawer({ taskId, onClose }) {
     setLoading(true);
     api.get(`/tasks/${taskId}`)
       .then(res => {
-        if (res.data?.task) setTask(res.data.task);
+        if (res.data?.task) {
+          setTask(res.data.task);
+          setAttachments(res.data.task.attachments || []);
+          setActivityLog(res.data.task.activityLog || []);
+        }
       })
       .catch(() => toast.error('Failed to load task details'))
       .finally(() => setLoading(false));
@@ -380,6 +389,21 @@ export default function TaskDrawer({ taskId, onClose }) {
                 </div>
               )}
             </div>
+
+            {/* Activity Log */}
+            <ActivityLog entries={activityLog} defaultExpanded={false} />
+
+            {/* Divider */}
+            <div style={{ height: 1, background: 'var(--border)' }} />
+
+            {/* Attachments */}
+            <AttachmentsPanel
+              taskId={task._id}
+              attachments={attachments}
+              currentUser={user}
+              onAttachmentAdded={att => setAttachments(prev => [...prev, att])}
+              onAttachmentDeleted={id => setAttachments(prev => prev.filter(a => a._id !== id))}
+            />
 
             {/* Divider */}
             <div style={{ height: 1, background: 'var(--border)' }} />

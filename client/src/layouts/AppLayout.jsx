@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { io } from 'socket.io-client';
@@ -8,7 +8,7 @@ import { logout } from '../redux/slices/authSlice';
 import {
   LayoutDashboard, FolderOpen, CheckSquare, Users,
   BarChart2, Settings, LogOut, Bell, Search, Rocket,
-  ChevronLeft, ChevronRight, Moon, Sun
+  ChevronLeft, ChevronRight, Moon, Sun, X
 } from 'lucide-react';
 
 function getInitials(name = '') {
@@ -27,7 +27,12 @@ export default function AppLayout() {
   const dispatch  = useDispatch();
   const navigate  = useNavigate();
   const { user }  = useSelector(s => s.auth);
-  const [search,    setSearch]    = useState('');
+  const [search,        setSearch]        = useState('');
+  const [searchResults, setSearchResults] = useState({ tasks: [], projects: [] });
+  const [isSearching,   setIsSearching]   = useState(false);
+  const [showSearchDrop, setShowSearchDrop] = useState(false);
+  const searchBoxRef = useRef(null);
+
   // Default sidebar to OPEN (false = not collapsed)
   const [collapsed, setCollapsed] = useState(false);
   const [darkMode,  setDarkMode]  = useState(
@@ -65,6 +70,45 @@ export default function AppLayout() {
       socket.disconnect();
     };
   }, [user]);
+
+  // Debounced search logic
+  useEffect(() => {
+    const q = search.trim();
+    if (q.length < 2) {
+      setSearchResults({ tasks: [], projects: [] });
+      setShowSearchDrop(false);
+      return;
+    }
+
+    setIsSearching(true);
+    const timer = setTimeout(() => {
+      api.get(`/search?q=${encodeURIComponent(q)}`)
+        .then(res => {
+          if (res.data?.success) {
+            setSearchResults({
+              tasks: res.data.tasks || [],
+              projects: res.data.projects || [],
+            });
+            setShowSearchDrop(true);
+          }
+        })
+        .catch(() => {})
+        .finally(() => setIsSearching(false));
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // Close search dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (searchBoxRef.current && !searchBoxRef.current.contains(e.target)) {
+        setShowSearchDrop(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleLogout = () => { dispatch(logout()); navigate('/login'); };
 
@@ -229,14 +273,106 @@ export default function AppLayout() {
       <div className="main-area">
         {/* Topbar */}
         <header className="topbar">
-          <div className="search-box">
+          <div className="search-box" ref={searchBoxRef} style={{ position: 'relative', minWidth: 280 }}>
             <Search size={14} />
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search tasks..."
+              onFocus={() => { if (search.trim().length >= 2) setShowSearchDrop(true); }}
+              placeholder="Search tasks or projects..."
               id="global-search"
             />
+            {search && (
+              <button
+                onClick={() => { setSearch(''); setShowSearchDrop(false); }}
+                style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: 2, display: 'flex' }}
+              >
+                <X size={13} />
+              </button>
+            )}
+
+            {/* Live Search Dropdown */}
+            {showSearchDrop && (
+              <div style={{
+                position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0,
+                background: 'var(--surface)', border: '1px solid var(--border)',
+                borderRadius: 10, boxShadow: '0 10px 30px rgba(0,0,0,0.18)',
+                zIndex: 9999, overflow: 'hidden', maxHeight: 380, overflowY: 'auto',
+                padding: '8px 0',
+              }}>
+                {isSearching ? (
+                  <div style={{ padding: '16px', textAlign: 'center', fontSize: '0.82rem', color: 'var(--text-3)' }}>
+                    Searching...
+                  </div>
+                ) : (searchResults.tasks.length === 0 && searchResults.projects.length === 0) ? (
+                  <div style={{ padding: '16px', textAlign: 'center', fontSize: '0.82rem', color: 'var(--text-3)' }}>
+                    No results matching "{search}"
+                  </div>
+                ) : (
+                  <>
+                    {searchResults.tasks.length > 0 && (
+                      <div>
+                        <div style={{ padding: '6px 12px', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          Tasks ({searchResults.tasks.length})
+                        </div>
+                        {searchResults.tasks.map(t => (
+                          <div
+                            key={t._id}
+                            onClick={() => {
+                              setShowSearchDrop(false);
+                              setSearch('');
+                              navigate('/tasks');
+                            }}
+                            style={{
+                              padding: '8px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                              transition: 'background 0.15s',
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'var(--bg)'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                          >
+                            <div>
+                              <div style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-1)' }}>{t.title}</div>
+                              <div style={{ fontSize: '0.72rem', color: 'var(--text-3)' }}>📁 {t.projectId?.title || 'General'}</div>
+                            </div>
+                            <span className="badge badge-gray" style={{ fontSize: '0.65rem' }}>{t.status}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {searchResults.projects.length > 0 && (
+                      <div style={{ borderTop: searchResults.tasks.length > 0 ? '1px solid var(--border)' : 'none', marginTop: 4, paddingTop: 4 }}>
+                        <div style={{ padding: '6px 12px', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          Projects ({searchResults.projects.length})
+                        </div>
+                        {searchResults.projects.map(p => (
+                          <div
+                            key={p._id}
+                            onClick={() => {
+                              setShowSearchDrop(false);
+                              setSearch('');
+                              navigate('/projects');
+                            }}
+                            style={{
+                              padding: '8px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                              transition: 'background 0.15s',
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'var(--bg)'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                          >
+                            <div>
+                              <div style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-1)' }}>{p.title}</div>
+                              {p.description && <div style={{ fontSize: '0.72rem', color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 220 }}>{p.description}</div>}
+                            </div>
+                            <span className="badge badge-blue" style={{ fontSize: '0.65rem' }}>{p.status}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto' }}>
