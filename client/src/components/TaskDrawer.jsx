@@ -4,6 +4,8 @@ import { updateTask } from '../redux/slices/tasksSlice';
 import CommentsThread from './CommentsThread';
 import AttachmentsPanel from './AttachmentsPanel';
 import ActivityLog from './ActivityLog';
+import SubtaskChecklist from './SubtaskChecklist';
+import TagPicker from './TagPicker';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import {
@@ -51,9 +53,11 @@ export default function TaskDrawer({ taskId, onClose }) {
   const [editingDesc, setEditingDesc] = useState(false);
   const [descDraft, setDescDraft] = useState('');
   const [saving, setSaving] = useState(false);
-  // Local attachment + activity state (populated from full GET)
-  const [attachments, setAttachments]   = useState([]);
-  const [activityLog, setActivityLog]   = useState([]);
+  // Local attachment, activity, subtask, and tag state
+  const [attachments, setAttachments] = useState([]);
+  const [activityLog, setActivityLog] = useState([]);
+  const [subtasks, setSubtasks]       = useState([]);
+  const [tags, setTags]               = useState([]);
 
   // Fetch full task detail (with comments populated)
   useEffect(() => {
@@ -65,6 +69,8 @@ export default function TaskDrawer({ taskId, onClose }) {
           setTask(res.data.task);
           setAttachments(res.data.task.attachments || []);
           setActivityLog(res.data.task.activityLog || []);
+          setSubtasks(res.data.task.subtasks || []);
+          setTags(res.data.task.tags || []);
         }
       })
       .catch(() => toast.error('Failed to load task details'))
@@ -464,6 +470,26 @@ export default function TaskDrawer({ taskId, onClose }) {
                 </div>
               )}
             </div>
+
+            {/* Tag Picker */}
+            <TagPicker
+              tags={tags}
+              onTagsChange={async (newTags) => {
+                setTags(newTags);
+                try {
+                  await dispatch(updateTask({ id: task._id, data: { tags: newTags } })).unwrap();
+                } catch {
+                  toast.error('Failed to update tags');
+                }
+              }}
+            />
+
+            {/* Subtask Checklist */}
+            <SubtaskChecklist
+              taskId={task._id}
+              subtasks={subtasks}
+              onSubtasksChange={setSubtasks}
+            />
 
             {/* Activity Log */}
             <ActivityLog entries={activityLog} defaultExpanded={false} />

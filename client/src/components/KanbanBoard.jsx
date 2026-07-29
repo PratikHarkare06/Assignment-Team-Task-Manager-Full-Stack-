@@ -89,7 +89,26 @@ function TaskCard({ task, onDragStart, onClick }) {
         </div>
       )}
 
-      {/* Footer: assignee + due date */}
+      {/* Tags */}
+      {task.tags && task.tags.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+          {task.tags.map(t => (
+            <span
+              key={t.name}
+              style={{
+                fontSize: '0.65rem', fontWeight: 700,
+                color: t.color || 'var(--accent)',
+                background: (t.color || 'var(--accent)') + '20',
+                padding: '1px 6px', borderRadius: 4,
+              }}
+            >
+              {t.name}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Footer: assignee + subtasks + due date */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
         {task.assignedTo ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -110,16 +129,24 @@ function TaskCard({ task, onDragStart, onClick }) {
           <div style={{ fontSize: '0.75rem', color: 'var(--text-3)' }}>Unassigned</div>
         )}
 
-        {dueDateInfo && (
-          <span style={{
-            fontSize: '0.72rem', fontWeight: 600,
-            color: dueDateInfo.color,
-            background: dueDateInfo.color + '18',
-            padding: '2px 6px', borderRadius: 4,
-          }}>
-            {dueDateInfo.label}
-          </span>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {task.subtasks && task.subtasks.length > 0 && (
+            <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-3)' }}>
+              ☑ {task.subtasks.filter(s => s.completed).length}/{task.subtasks.length}
+            </span>
+          )}
+
+          {dueDateInfo && (
+            <span style={{
+              fontSize: '0.72rem', fontWeight: 600,
+              color: dueDateInfo.color,
+              background: dueDateInfo.color + '18',
+              padding: '2px 6px', borderRadius: 4,
+            }}>
+              {dueDateInfo.label}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

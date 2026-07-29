@@ -3,6 +3,8 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { io } from 'socket.io-client';
 import toast from 'react-hot-toast';
+import NotificationPopover from '../components/NotificationPopover';
+import TaskDrawer from '../components/TaskDrawer';
 import api from '../services/api';
 import { logout } from '../redux/slices/authSlice';
 import {
@@ -39,7 +41,9 @@ export default function AppLayout() {
     () => localStorage.getItem('theme-dark') === 'true'
   );
 
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotifPopover, setShowNotifPopover] = useState(false);
+  const [drawerTaskId,     setDrawerTaskId]     = useState(null);
+  const [unreadCount, setUnreadCount]           = useState(0);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
@@ -420,15 +424,32 @@ export default function AppLayout() {
               {darkMode ? <Sun size={16} /> : <Moon size={16} />}
             </button>
 
-            <button className="icon-btn" onClick={() => navigate('/notifications')} style={{ position: 'relative' }}>
-              <Bell size={16} />
-              {unreadCount > 0 && (
-                <span style={{
-                  position: 'absolute', top: 2, right: 2,
-                  background: 'var(--accent)', width: 8, height: 8, borderRadius: '50%'
-                }} />
+            <div style={{ position: 'relative' }}>
+              <button
+                className="icon-btn"
+                onClick={() => setShowNotifPopover(p => !p)}
+                title="Notifications"
+                style={{ position: 'relative' }}
+              >
+                <Bell size={16} />
+                {unreadCount > 0 && (
+                  <span style={{
+                    position: 'absolute', top: 2, right: 2,
+                    background: 'var(--accent)', width: 8, height: 8, borderRadius: '50%'
+                  }} />
+                )}
+              </button>
+
+              {showNotifPopover && (
+                <NotificationPopover
+                  onClose={() => setShowNotifPopover(false)}
+                  onNotificationClick={(taskId) => {
+                    setShowNotifPopover(false);
+                    setDrawerTaskId(taskId);
+                  }}
+                />
               )}
-            </button>
+            </div>
 
             {user?.avatar ? (
               <img
@@ -452,6 +473,13 @@ export default function AppLayout() {
         <main className="page-content">
           <Outlet />
         </main>
+
+        {drawerTaskId && (
+          <TaskDrawer
+            taskId={drawerTaskId}
+            onClose={() => setDrawerTaskId(null)}
+          />
+        )}
       </div>
     </div>
   );

@@ -319,13 +319,25 @@ export default function Tasks() {
                         style={{ cursor: 'pointer' }}
                       >
                         <td style={{ color: 'var(--text-3)', fontSize: '0.8rem', fontFamily: 'var(--font-mono)' }}>T-{100 + displayIndex}</td>
-                        <td style={{ fontWeight: 500, maxWidth: 220 }}>
+                        <td style={{ fontWeight: 500, maxWidth: 240 }}>
                           <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</div>
-                          {task.comments?.length > 0 && (
-                            <div style={{ fontSize: '0.7rem', color: 'var(--text-3)', marginTop: 2 }}>
-                              💬 {task.comments.length} comment{task.comments.length !== 1 ? 's' : ''}
-                            </div>
-                          )}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
+                            {task.tags && task.tags.map(t => (
+                              <span key={t.name} style={{ fontSize: '0.65rem', fontWeight: 600, color: t.color || 'var(--accent)', background: (t.color || 'var(--accent)') + '18', padding: '1px 5px', borderRadius: 4 }}>
+                                {t.name}
+                              </span>
+                            ))}
+                            {task.subtasks?.length > 0 && (
+                              <span style={{ fontSize: '0.68rem', color: 'var(--text-3)', fontWeight: 500 }}>
+                                ☑ {task.subtasks.filter(s => s.completed).length}/{task.subtasks.length}
+                              </span>
+                            )}
+                            {task.comments?.length > 0 && (
+                              <span style={{ fontSize: '0.68rem', color: 'var(--text-3)' }}>
+                                💬 {task.comments.length}
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td>{getStatusBadge(task.status)}</td>
                         <td>

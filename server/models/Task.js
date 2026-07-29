@@ -30,6 +30,21 @@ const activityLogSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+const subtaskSchema = new mongoose.Schema(
+  {
+    title:     { type: String, required: true, trim: true },
+    completed: { type: Boolean, default: false },
+  },
+  { timestamps: true }
+);
+
+const tagSchema = new mongoose.Schema(
+  {
+    name:  { type: String, required: true, trim: true },
+    color: { type: String, default: '#6366F1' },
+  }
+);
+
 const taskSchema = new mongoose.Schema(
   {
     title: {
@@ -53,6 +68,8 @@ const taskSchema = new mongoose.Schema(
     estimatedHours: { type: Number, default: 0 },
     loggedHours:    { type: Number, default: 0 },
     createdBy:      { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    subtasks:       [subtaskSchema],
+    tags:           [tagSchema],
     comments:       [commentSchema],
     attachments:    [attachmentSchema],
     activityLog:    [activityLogSchema],

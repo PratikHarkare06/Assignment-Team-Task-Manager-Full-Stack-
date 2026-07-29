@@ -372,8 +372,77 @@ const deleteAttachment = async (req, res) => {
   }
 };
 
+// @desc    Add subtask
+// @route   POST /api/tasks/:id/subtasks
+// @access  Private
+const addSubtask = async (req, res) => {
+  try {
+    const { title } = req.body;
+    if (!title || !title.trim()) {
+      return res.status(400).json({ success: false, message: 'Subtask title is required' });
+    }
+
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
+
+    task.subtasks.push({ title: title.trim(), completed: false });
+    logActivity(task, req.user._id, `added subtask "${title.trim()}"`, 'subtasks', '', title.trim());
+    await task.save();
+
+    const newSubtask = task.subtasks[task.subtasks.length - 1];
+    res.status(201).json({ success: true, subtask: newSubtask, subtasks: task.subtasks });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Toggle subtask completed status
+// @route   PUT /api/tasks/:id/subtasks/:subtaskId
+// @access  Private
+const toggleSubtask = async (req, res) => {
+  try {
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
+
+    const subtask = task.subtasks.id(req.params.subtaskId);
+    if (!subtask) return res.status(404).json({ success: false, message: 'Subtask not found' });
+
+    subtask.completed = req.body.completed !== undefined ? req.body.completed : !subtask.completed;
+    logActivity(task, req.user._id, subtask.completed ? `completed subtask "${subtask.title}"` : `uncompleted subtask "${subtask.title}"`, 'subtasks', '', subtask.title);
+    await task.save();
+
+    res.json({ success: true, subtask, subtasks: task.subtasks });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Delete subtask
+// @route   DELETE /api/tasks/:id/subtasks/:subtaskId
+// @access  Private
+const deleteSubtask = async (req, res) => {
+  try {
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
+
+    const subtask = task.subtasks.id(req.params.subtaskId);
+    if (!subtask) return res.status(404).json({ success: false, message: 'Subtask not found' });
+
+    const subTitle = subtask.title;
+    subtask.deleteOne();
+    logActivity(task, req.user._id, `deleted subtask "${subTitle}"`, 'subtasks', subTitle, '');
+    await task.save();
+
+    res.json({ success: true, message: 'Subtask deleted', subtasks: task.subtasks });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   createTask, getTasks, getTask, updateTask, deleteTask,
   addComment, deleteComment,
   addAttachment, deleteAttachment,
+  addSubtask, toggleSubtask, deleteSubtask,
 };
+

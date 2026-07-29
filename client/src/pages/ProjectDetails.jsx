@@ -3,9 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchProjects } from '../redux/slices/projectsSlice';
 import { fetchTasks, createTask, updateTask } from '../redux/slices/tasksSlice';
-import { Plus, Search, ArrowLeft, MoreHorizontal, Calendar } from 'lucide-react';
+import { Plus, Search, ArrowLeft, MoreHorizontal, Calendar, FileText, Users, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
+import ProjectReportModal from '../components/ProjectReportModal';
+import ProjectMembersModal from '../components/ProjectMembersModal';
+import TaskDrawer from '../components/TaskDrawer';
 
 const COLUMNS = ['Todo', 'In Progress', 'Completed'];
 const PRIORITIES = ['High', 'Medium', 'Low'];
@@ -18,6 +21,122 @@ function priorityBadge(p) {
 
 const COLORS = ['#6366F1', '#22C55E', '#F59E0B', '#E5484D', '#8B5CF6'];
 
+/* ── Gantt Chart View Component ───────────────────────────────────────────── */
+function GanttView({ tasks, onTaskClick }) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const days = Array.from({ length: 14 }, (_, i) => {
+    const d = new Date(today);
+    d.setDate(d.getDate() + i);
+    return d;
+  });
+
+  const STATUS_COLORS = {
+    todo: '#6B7280',
+    'in-progress': '#3B82F6',
+    completed: '#22C55E',
+    blocked: '#E5484D',
+  };
+
+  return (
+    <div className="card" style={{ padding: 0, overflow: 'auto' }}>
+      {/* Date Header */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: '220px repeat(14, 1fr)',
+        borderBottom: '1px solid var(--border)', background: 'var(--bg)',
+        minWidth: 900,
+      }}>
+        <div style={{ padding: '10px 14px', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase' }}>
+          Task Name
+        </div>
+        {days.map((d, i) => (
+          <div key={i} style={{
+            padding: '8px 4px', textAlign: 'center',
+            fontSize: '0.7rem', fontWeight: 600,
+            borderLeft: '1px solid var(--border)',
+            color: d.getDay() === 0 || d.getDay() === 6 ? 'var(--accent)' : 'var(--text-2)',
+          }}>
+            <div>{d.toLocaleDateString('en-US', { weekday: 'narrow' })}</div>
+            <div style={{ fontWeight: 700 }}>{d.getDate()}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Task Rows */}
+      <div style={{ minWidth: 900 }}>
+        {tasks.length === 0 ? (
+          <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-3)', fontSize: '0.85rem' }}>
+            No tasks to display in Gantt Timeline
+          </div>
+        ) : (
+          tasks.map(task => {
+            const created = new Date(task.createdAt || Date.now());
+            created.setHours(0, 0, 0, 0);
+            const due = task.dueDate ? new Date(task.dueDate) : new Date(created.getTime() + 3 * 86400000);
+            due.setHours(0, 0, 0, 0);
+
+            const startDiff = Math.max(0, Math.round((created - today) / 86400000));
+            const endDiff   = Math.max(startDiff, Math.round((due - today) / 86400000));
+
+            const colStart = Math.min(14, Math.max(1, startDiff + 1));
+            const colEnd   = Math.min(14, Math.max(colStart, endDiff + 1));
+            const span     = Math.max(1, colEnd - colStart + 1);
+
+            const statusKey = (task.status || 'todo').toLowerCase().replace(' ', '-');
+            const barColor = STATUS_COLORS[statusKey] || '#6366F1';
+
+            return (
+              <div
+                key={task._id}
+                onClick={() => onTaskClick(task._id)}
+                style={{
+                  display: 'grid', gridTemplateColumns: '220px repeat(14, 1fr)',
+                  alignItems: 'center', borderBottom: '1px solid var(--border)',
+                  minHeight: 44, cursor: 'pointer',
+                }}
+              >
+                <div style={{
+                  padding: '8px 14px', fontSize: '0.84rem', fontWeight: 600,
+                  color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  {task.title}
+                </div>
+
+                <div style={{
+                  gridColumn: `2 / span 14`, display: 'grid', gridTemplateColumns: 'repeat(14, 1fr)',
+                  height: '100%', alignItems: 'center', position: 'relative',
+                }}>
+                  {days.map((_, i) => (
+                    <div key={i} style={{ height: '100%', borderLeft: '1px solid var(--border)' }} />
+                  ))}
+
+                  <div
+                    title={`${task.title} (${task.status}) - Due: ${task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'N/A'}`}
+                    style={{
+                      position: 'absolute',
+                      left: `calc(${((colStart - 1) / 14) * 100}% + 4px)`,
+                      width: `calc(${(span / 14) * 100}% - 8px)`,
+                      height: 24, borderRadius: 6,
+                      background: barColor,
+                      color: 'white', fontSize: '0.72rem', fontWeight: 700,
+                      display: 'flex', alignItems: 'center', padding: '0 8px',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {task.title}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function ProjectDetails() {
   const { id } = useParams();
   const dispatch = useDispatch();
@@ -25,14 +144,17 @@ export default function ProjectDetails() {
   const { list: projects } = useSelector(s => s.projects);
   const { list: tasks } = useSelector(s => s.tasks);
   const { user } = useSelector(s => s.auth);
-  const isAdmin = user?.role === 'admin';
 
-  const [view, setView] = useState('Board');
-  const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ title: '', description: '', priority: 'Medium', status: 'Todo', dueDate: '', assignedTo: '' });
-  const [creating, setCreating] = useState(false);
-  const [search, setSearch] = useState('');
-  const [users, setUsers] = useState([]);
+  const [view, setView]               = useState('Board');
+  const [showModal, setShowModal]     = useState(false);
+  const [showReport, setShowReport]   = useState(false);
+  const [showMembers, setShowMembers] = useState(false);
+  const [drawerTaskId, setDrawerTaskId] = useState(null);
+
+  const [form, setForm]               = useState({ title: '', description: '', priority: 'Medium', status: 'Todo', dueDate: '', assignedTo: '' });
+  const [creating, setCreating]       = useState(false);
+  const [search, setSearch]           = useState('');
+  const [users, setUsers]             = useState([]);
 
   useEffect(() => {
     dispatch(fetchProjects());
@@ -58,20 +180,15 @@ export default function ProjectDetails() {
     finally { setCreating(false); }
   };
 
-  const moveTask = async (task, newStatus) => {
-    try { await dispatch(updateTask({ id: task._id, data: { status: newStatus } })).unwrap(); }
-    catch { toast.error('Update failed'); }
-  };
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 0, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
           <button className="btn btn-ghost btn-sm" onClick={() => navigate('/projects')} style={{ padding: '6px 8px' }}>
             <ArrowLeft size={16} />
           </button>
-          <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{project?.name || 'Project'}</div>
+          <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{project?.name || project?.title || 'Project'}</div>
           <div style={{ width: 1, height: 20, background: 'var(--border)' }} />
           <div className="tab-group" style={{ background: 'transparent', border: 'none', gap: 4 }}>
             {['Board', 'List', 'Timeline'].map(v => (
@@ -79,10 +196,20 @@ export default function ProjectDetails() {
             ))}
           </div>
         </div>
-        <div className="search-box" style={{ minWidth: 200 }}>
+
+        <div className="search-box" style={{ minWidth: 180 }}>
           <Search size={14} />
           <input placeholder="Search tasks..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
+
+        <button className="btn btn-secondary btn-sm" onClick={() => setShowMembers(true)}>
+          <Users size={14} /> Members ({project?.members?.length || 0})
+        </button>
+
+        <button className="btn btn-secondary btn-sm" onClick={() => setShowReport(true)}>
+          <FileText size={14} /> Report
+        </button>
+
         <button className="btn btn-primary" onClick={() => setShowModal(true)}>
           <Plus size={15} /> New Task
         </button>
@@ -108,7 +235,7 @@ export default function ProjectDetails() {
                 {colTasks.map(task => {
                   const idx = filtered.indexOf(task);
                   return (
-                    <div key={task._id} className="kanban-card">
+                    <div key={task._id} className="kanban-card" onClick={() => setDrawerTaskId(task._id)} style={{ cursor: 'pointer' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                         {priorityBadge(task.priority)}
                         <button className="btn btn-ghost btn-sm" style={{ padding: '2px 4px' }}>
@@ -144,7 +271,7 @@ export default function ProjectDetails() {
       )}
 
       {/* List view */}
-      {view !== 'Board' && (
+      {view === 'List' && (
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
           <table className="data-table">
             <thead>
@@ -154,7 +281,7 @@ export default function ProjectDetails() {
             </thead>
             <tbody>
               {filtered.map(task => (
-                <tr key={task._id}>
+                <tr key={task._id} onClick={() => setDrawerTaskId(task._id)} style={{ cursor: 'pointer' }}>
                   <td style={{ fontWeight: 500 }}>{task.title}</td>
                   <td><span className="badge badge-gray">{task.status || 'Todo'}</span></td>
                   <td>
@@ -177,6 +304,34 @@ export default function ProjectDetails() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Timeline Gantt View */}
+      {view === 'Timeline' && (
+        <GanttView tasks={filtered} onTaskClick={setDrawerTaskId} />
+      )}
+
+      {/* Task Drawer */}
+      {drawerTaskId && (
+        <TaskDrawer taskId={drawerTaskId} onClose={() => setDrawerTaskId(null)} />
+      )}
+
+      {/* Executive Report Modal */}
+      {showReport && (
+        <ProjectReportModal
+          project={project}
+          tasks={projectTasks}
+          onClose={() => setShowReport(false)}
+        />
+      )}
+
+      {/* Project Members Modal */}
+      {showMembers && project && (
+        <ProjectMembersModal
+          project={project}
+          onMembersUpdated={() => dispatch(fetchProjects())}
+          onClose={() => setShowMembers(false)}
+        />
       )}
 
       {/* Task Modal */}

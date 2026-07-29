@@ -4,6 +4,7 @@ const {
   createTask, getTasks, getTask, updateTask, deleteTask,
   addComment, deleteComment,
   addAttachment, deleteAttachment,
+  addSubtask, toggleSubtask, deleteSubtask,
 } = require('../controllers/taskController');
 const { protect } = require('../middleware/auth');
 
@@ -19,5 +20,10 @@ router.delete('/:id/comments/:commentId', deleteComment);
 // Attachment routes
 router.post('/:id/attachments', addAttachment);
 router.delete('/:id/attachments/:attachmentId', deleteAttachment);
+
+// Subtask routes
+router.post('/:id/subtasks', addSubtask);
+router.put('/:id/subtasks/:subtaskId', toggleSubtask);
+router.delete('/:id/subtasks/:subtaskId', deleteSubtask);
 
 module.exports = router;
