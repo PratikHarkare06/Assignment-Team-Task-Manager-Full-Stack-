@@ -26,8 +26,6 @@ services:
   - type: web
     name: momentum-app
     runtime: static
-    region: oregon
-    plan: free
     rootDir: client
     buildCommand: npm install && npm run build
     staticPublishPath: dist
