@@ -102,6 +102,6 @@ This repository includes a `render.yaml` blueprint config file for easy orchestr
 ---
 
 ## 📸 Application Preview
-<img width="1470" height="832" alt="Momentum Dashboard Preview" src="https://github.com/user-attachments/assets/6f860b04-8f9f-4a3e-bfee-3644f8256001" />
+<img width="2940" height="1668" alt="image" src="https://github.com/user-attachments/assets/700f3069-425e-4762-950c-039be29c0133" />
 
 *Developed as a high-performance workspace tool.*
