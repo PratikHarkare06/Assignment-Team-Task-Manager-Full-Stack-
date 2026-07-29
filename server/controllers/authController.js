@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const Notification = require('../models/Notification');
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '7d' });
@@ -147,22 +148,25 @@ const inviteUser = async (req, res) => {
   try {
     const { email, role } = req.body;
 
-    if (!email) {
+    if (!email || !email.trim()) {
       return res.status(400).json({ success: false, message: 'Email is required' });
     }
 
-    let user = await User.findOne({ email });
+    const cleanEmail = email.trim().toLowerCase();
+
+    let user = await User.findOne({ email: cleanEmail });
     if (user) {
-      return res.status(400).json({ success: false, message: 'User already exists' });
+      return res.status(400).json({ success: false, message: 'User with this email already exists' });
     }
 
-    const userName = email.split('@')[0];
+    const userName = cleanEmail.split('@')[0];
     const validRole = role === 'admin' ? 'admin' : 'member';
+    const tempPassword = `Invite_${Math.random().toString(36).slice(2, 10)}!`;
     
     user = await User.create({
-      name: userName,
-      email,
-      password: `invite_${Math.random().toString(36).slice(2)}`,
+      name: userName.charAt(0).toUpperCase() + userName.slice(1),
+      email: cleanEmail,
+      password: tempPassword,
       role: validRole,
     });
 
@@ -172,15 +176,45 @@ const inviteUser = async (req, res) => {
       email: user.email,
       role: user.role,
       createdAt: user.createdAt,
+      tempPassword,
     };
 
-    // Emit real-time event to all connected clients
+    // Create notifications for all other existing users
+    try {
+      const existingUsers = await User.find({ _id: { $ne: user._id } }).select('_id');
+      const notifDocs = existingUsers.map(u => ({
+        recipient: u._id,
+        type: 'system',
+        title: '🎉 New Team Member Joined',
+        body: `${user.name} (${user.email}) was invited to the workspace as ${validRole.toUpperCase()}.`,
+      }));
+      if (notifDocs.length > 0) {
+        await Notification.insertMany(notifDocs);
+      }
+    } catch (notifErr) {
+      console.error('Failed to create invite notifications', notifErr);
+    }
+
+    // Real-time WebSocket emission
     const io = req.app.get('io');
     if (io) {
       io.emit('member_added', userObj);
+      io.emit('notification', {
+        title: '🎉 New Team Member Invited',
+        body: `${user.name} (${user.email}) was invited to the workspace.`,
+      });
     }
 
-    res.status(201).json({ success: true, user: userObj });
+    const clientOrigin = req.get('origin') || 'http://localhost:5173';
+    const inviteLink = `${clientOrigin}/login?email=${encodeURIComponent(cleanEmail)}`;
+
+    res.status(201).json({
+      success: true,
+      message: 'Invitation generated successfully',
+      user: userObj,
+      inviteLink,
+      tempPassword,
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

@@ -24,6 +24,9 @@ export default function Team() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('member');
 
+  const [inviteResult, setInviteResult] = useState(null);
+  const [sendingInvite, setSendingInvite] = useState(false);
+
   useEffect(() => {
     // Fetch initial users
     api.get('/users').then(r => {
@@ -51,8 +54,13 @@ export default function Team() {
         activity: 'New',
       };
       
-      setMembers(prev => [formattedUser, ...prev]);
-      toast.success(`${formattedUser.name} joined the team!`);
+      setMembers(prev => {
+        if (prev.some(m => m._id === formattedUser._id || m.email?.toLowerCase() === formattedUser.email?.toLowerCase())) {
+          return prev;
+        }
+        return [formattedUser, ...prev];
+      });
+      toast.success(`🎉 ${formattedUser.name} joined the team!`);
     });
 
     return () => {
@@ -80,13 +88,43 @@ export default function Team() {
 
   const handleInvite = async (e) => {
     e.preventDefault();
+    setSendingInvite(true);
     try {
-      await api.post('/users/invite', { email: inviteEmail, role: inviteRole });
-      toast.success(`Invitation sent to ${inviteEmail}`);
-      setShowInvite(false);
-      setInviteEmail('');
+      const res = await api.post('/users/invite', { email: inviteEmail, role: inviteRole });
+      if (res.data?.success) {
+        const newUser = res.data.user;
+        const formattedUser = {
+          _id: newUser._id,
+          name: newUser.name || 'User',
+          email: newUser.email,
+          role: newUser.role === 'admin' ? 'Admin' : 'Member',
+          joined: new Date(newUser.createdAt || Date.now()).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+          online: true,
+          tasks: 0,
+          activity: 'New',
+        };
+
+        setMembers(prev => {
+          if (prev.some(m => m._id === formattedUser._id || m.email?.toLowerCase() === formattedUser.email?.toLowerCase())) {
+            return prev;
+          }
+          return [formattedUser, ...prev];
+        });
+
+        setInviteResult({
+          email: inviteEmail,
+          inviteLink: res.data.inviteLink,
+          tempPassword: res.data.tempPassword,
+        });
+
+        toast.success(`Invitation generated for ${inviteEmail}`);
+        setShowInvite(false);
+        setInviteEmail('');
+      }
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to send invitation');
+    } finally {
+      setSendingInvite(false);
     }
   };
 
@@ -233,9 +271,63 @@ export default function Team() {
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowInvite(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Send Invite</button>
+                <button type="submit" className="btn btn-primary" disabled={sendingInvite}>
+                  {sendingInvite ? 'Sending…' : 'Send Invite'}
+                </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Invite Details / Link Success Modal */}
+      {inviteResult && (
+        <div className="modal-overlay" onClick={() => setInviteResult(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
+            <div className="modal-header">
+              <div className="modal-title" style={{ color: '#22C55E' }}>🎉 Invitation Generated</div>
+              <button className="btn btn-ghost btn-sm" onClick={() => setInviteResult(null)}>✕</button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ fontSize: '0.88rem', color: 'var(--text-1)' }}>
+                <strong>{inviteResult.email}</strong> has been added to your workspace. Share the invitation details below:
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Direct Invite Link</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input className="form-input" value={inviteResult.inviteLink} readOnly />
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={() => {
+                      navigator.clipboard.writeText(inviteResult.inviteLink);
+                      toast.success('Invite link copied to clipboard!');
+                    }}
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Temporary Account Password</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input className="form-input" value={inviteResult.tempPassword} readOnly />
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => {
+                      navigator.clipboard.writeText(inviteResult.tempPassword);
+                      toast.success('Temporary password copied!');
+                    }}
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-primary" onClick={() => setInviteResult(null)}>Done</button>
+            </div>
           </div>
         </div>
       )}
