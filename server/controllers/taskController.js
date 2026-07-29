@@ -127,7 +127,7 @@ const updateTask = async (req, res) => {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
 
-    let { title, description, assignedTo, status, priority, dueDate, estimatedHours, loggedHours } = req.body;
+    let { title, description, assignedTo, status, priority, dueDate, estimatedHours, loggedHours, tags } = req.body;
     if (status)   status   = status.toLowerCase().replace(' ', '-');
     if (priority) priority = priority.toLowerCase();
 
@@ -163,6 +163,10 @@ const updateTask = async (req, res) => {
     if (loggedHours !== undefined && Number(loggedHours) !== task.loggedHours) {
       logActivity(task, req.user._id, `logged ${Number(loggedHours) - task.loggedHours}h`, 'loggedHours', `${task.loggedHours}h`, `${loggedHours}h`);
       task.loggedHours = Number(loggedHours) || 0;
+    }
+    if (tags !== undefined && Array.isArray(tags)) {
+      logActivity(task, req.user._id, `updated tags`, 'tags', '', tags.map(t => t.name).join(', '));
+      task.tags = tags;
     }
 
     await task.save();
