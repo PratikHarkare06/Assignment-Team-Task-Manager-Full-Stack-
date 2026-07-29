@@ -1,40 +1,30 @@
-# 🚀 Momentum - Team Task Manager
+# 🚀 Momentum - Enterprise Team Task Manager
 
-A full-stack, real-time Project and Task Management Web Application designed for high-performance teams. 
+A high-performance, full-stack, real-time Project and Task Management Web Application designed for enterprise teams. 
 
-Built with **React, Node.js, Express, and MongoDB**, and fully deployed on **Railway**.
+Built with **React 19, Node.js, Express, MongoDB Atlas, and Socket.io**, and fully deployed on **Render** (via Render Blueprints).
 
 ### 🌐 Live Deployment
-- **Live Application URL:** [https://diligent-eagerness-production-2617.up.railway.app/](https://diligent-eagerness-production-2617.up.railway.app/)
-- **Backend API URL:** [https://assignment-team-task-manager-full-stack-production.up.railway.app/](https://assignment-team-task-manager-full-stack-production.up.railway.app/)
+- **Live Application URL:** [https://momentum-app-m4cz.onrender.com](https://momentum-app-m4cz.onrender.com)
+- **Backend API URL:** [https://momentum-api-qq9e.onrender.com](https://momentum-api-qq9e.onrender.com)
 
 ---
 
-## ✨ Key Features (Assignment Requirements Met)
+## ✨ Key Features & Enterprise Additions
 
-✅ **Authentication (Signup/Login)**
-- Secure email/password authentication using Firebase.
-- Protected frontend routes and JWT-verified backend API endpoints.
+### 🛠️ Core Capabilities
+* **Authentication & RBAC**: Secure Firebase-backed sign-in with robust role checks (Admins vs. Members).
+* **Interactive Kanban Board**: Fully responsive drag-and-drop workflow tracking with columns for To Do, In Progress, Blocked, and Completed.
+* **Team Space**: Centralized workspace management to view online statuses, activity metrics, and role assignments.
 
-✅ **Project & Team Management**
-- Users can create, update, and delete projects.
-- Invite and manage team members within a project.
-
-✅ **Task Creation, Assignment & Status Tracking**
-- Create tasks with priorities, due dates, and assign them to specific team members.
-- **Interactive Kanban Board**: Drag-and-drop tasks between "To Do", "In Progress", and "Done" columns.
-
-✅ **Dashboard**
-- Visual overview of project health, including pie charts and bar charts.
-- Instantly identify pending and overdue tasks across all projects.
-
-✅ **Proper Validations & Relationships**
-- Relational NoSQL data modeling using Mongoose (Users ↔ Projects ↔ Tasks).
-- Robust backend validation and error handling.
-
-✅ **Role-Based Access Control (RBAC)**
-- **Admins:** Can manage project settings, delete projects, and remove team members.
-- **Members:** Can view projects, add tasks, and update task statuses.
+### 🌟 Advanced Enterprise Features (New)
+* **📋 Subtasks & Checklists**: Create granular subtasks within any task, complete with real-time checkbox status updates and completion ratio tracking.
+* **🏷️ Custom Tags & Labels**: Categorize tasks with custom color-coded labels (e.g., Bug, Feature, Backend, Design) via an interactive picker.
+* **📊 Gantt / Timeline View**: Track project timelines and schedule dependencies visually using a custom interactive Gantt chart.
+* **📄 Exportable PDF Reports**: Generate, customize, and download printable project reports detailing task breakdowns, resource allocations, and progress metrics.
+* **🔔 Live Socket.io Notifications**: Real-time popover notifications for task assignments, updates, and member activities.
+* **👥 Project Member Scoping**: Assign team members to specific projects to restrict access and visibility to authorized personnel only.
+* **✉️ Real-Time Invitation System**: Invite users by email with automatic secure temporary password generation, instant notification broadcast, and shareable copy-to-clipboard invite links.
 
 ---
 
@@ -42,21 +32,19 @@ Built with **React, Node.js, Express, and MongoDB**, and fully deployed on **Rai
 
 | Layer | Technology |
 |---|---|
-| **Frontend** | React 19, Vite, Tailwind CSS, Redux Toolkit, Lucide React |
-| **Backend** | Node.js, Express.js, Firebase Admin, Helmet (Security) |
-| **Database** | MongoDB & Mongoose |
-| **Deployment** | Railway (Nixpacks & Custom Dockerfiles) |
+| **Frontend** | React 19, Vite, Tailwind CSS, Redux Toolkit, Socket.io-client, Recharts, Lucide React |
+| **Backend** | Node.js, Express.js, Firebase Admin SDK, Socket.io, Helmet (Security), Express Rate Limit |
+| **Database** | MongoDB Atlas & Mongoose |
+| **Deployment** | Render (Infrastructure-as-Code via `render.yaml` blueprint) |
 
 ---
 
 ## ⚙️ Local Setup Instructions
 
-If you want to run this project locally on your machine, follow these steps:
-
 ### 1. Prerequisites
 - Node.js (v20 or higher)
-- A MongoDB instance (local or MongoDB Atlas)
-- A Firebase Project (for authentication)
+- A MongoDB Atlas database connection string
+- A Firebase Project (for client-side auth)
 
 ### 2. Backend Setup
 ```bash
@@ -66,11 +54,12 @@ npm install
 Create a `.env` file inside the `server` folder:
 ```env
 PORT=8000
-MONGO_URI=your_mongodb_connection_string
+MONGO_URI=your_mongodb_atlas_connection_string
 JWT_SECRET=your_super_secret_jwt_key
 CLIENT_URL=http://localhost:5173
+FIREBASE_PROJECT_ID=your_firebase_project_id
 ```
-Run the backend:
+Run the backend server:
 ```bash
 npm run dev
 ```
@@ -89,16 +78,30 @@ VITE_FIREBASE_PROJECT_ID=your_firebase_project_id
 VITE_FIREBASE_STORAGE_BUCKET=your_firebase_storage_bucket
 VITE_FIREBASE_MESSAGING_SENDER_ID=your_firebase_messaging_sender_id
 VITE_FIREBASE_APP_ID=your_firebase_app_id
+VITE_FIREBASE_MEASUREMENT_ID=your_firebase_measurement_id
 ```
-Run the frontend:
+Run the development client:
 ```bash
 npm run dev
 ```
 
 ---
 
-## 📸 Application Screenshots
-*(You can add screenshots or GIF links of your application here)*
-<img width="1470" height="832" alt="Screenshot 2026-05-13 at 4 43 45 PM" src="https://github.com/user-attachments/assets/6f860b04-8f9f-4a3e-bfee-3644f8256001" />
+## 🚀 One-Click Production Deployment (Render)
 
-*Developed for the Full-Stack Web Development Assignment.*
+This repository includes a `render.yaml` blueprint config file for easy orchestration of both backend API and frontend static hosting in one click.
+
+1. Go to your **Render Dashboard** → **Blueprints** → **New Blueprint Instance**.
+2. Connect your GitHub repository.
+3. Provide the secret environment variables (`MONGO_URI`, `JWT_SECRET`, Firebase configs) when prompted.
+4. Render will automatically provision:
+   - **Backend Web Service** running Node.js.
+   - **Frontend Static Site** running the Vite production build.
+5. In your `momentum-app` (Static Site) configuration, verify `VITE_API_URL` is set to your deployed backend URL.
+
+---
+
+## 📸 Application Preview
+<img width="1470" height="832" alt="Momentum Dashboard Preview" src="https://github.com/user-attachments/assets/6f860b04-8f9f-4a3e-bfee-3644f8256001" />
+
+*Developed as a high-performance workspace tool.*
