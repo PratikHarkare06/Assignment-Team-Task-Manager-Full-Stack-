@@ -188,12 +188,13 @@ const inviteUser = async (req, res) => {
 
 const updateProfile = async (req, res) => {
   try {
-    const { name, avatar } = req.body;
+    const { name, avatar, role } = req.body;
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
     if (name) user.name = name.trim();
     if (avatar !== undefined) user.avatar = avatar;
+    if (role && ['admin', 'member'].includes(role)) user.role = role;
 
     await user.save();
 
@@ -213,5 +214,35 @@ const updateProfile = async (req, res) => {
   }
 };
 
-module.exports = { signup, login, getMe, getUsers, firebaseAuth, inviteUser, updateProfile };
+const updateUserRole = async (req, res) => {
+  try {
+    const { role } = req.body;
+    if (!['admin', 'member'].includes(role)) {
+      return res.status(400).json({ success: false, message: 'Invalid role' });
+    }
+
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    user.role = role;
+    await user.save();
+
+    res.json({
+      success: true,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        avatar: user.avatar,
+        createdAt: user.createdAt,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports = { signup, login, getMe, getUsers, firebaseAuth, inviteUser, updateProfile, updateUserRole };
+
 

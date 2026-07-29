@@ -83,11 +83,9 @@ export default function ProjectDetails() {
           <Search size={14} />
           <input placeholder="Search tasks..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        {isAdmin && (
-          <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-            <Plus size={15} /> New Task
-          </button>
-        )}
+        <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+          <Plus size={15} /> New Task
+        </button>
       </div>
 
       <div className="divider" style={{ margin: '16px -28px 20px', width: 'calc(100% + 56px)' }} />

@@ -239,11 +239,9 @@ export default function Projects() {
               onChange={e => setSearch(e.target.value)}
             />
           </div>
-          {isAdmin && (
-            <button id="new-project-btn" className="btn btn-primary" onClick={() => setShowModal(true)}>
-              <Plus size={15} /> New Project
-            </button>
-          )}
+          <button id="new-project-btn" className="btn btn-primary" onClick={() => setShowModal(true)}>
+            <Plus size={15} /> New Project
+          </button>
         </div>
       </div>
 

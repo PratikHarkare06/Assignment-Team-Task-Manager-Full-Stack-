@@ -28,6 +28,7 @@ export default function Team() {
     // Fetch initial users
     api.get('/users').then(r => {
       if (r.data?.users?.length) setMembers(r.data.users.map((u, i) => ({
+        _id: u._id,
         name: u.name || 'User', email: u.email, role: u.role === 'admin' ? 'Admin' : 'Member',
         joined: new Date(u.createdAt || Date.now()).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
         online: Math.random() > 0.4, tasks: Math.floor(Math.random() * 20 + 1), activity: ['High', 'Normal', 'Low'][i % 3],
@@ -40,11 +41,12 @@ export default function Team() {
 
     socket.on('member_added', (newUser) => {
       const formattedUser = {
+        _id: newUser._id,
         name: newUser.name || 'User',
         email: newUser.email,
         role: newUser.role === 'admin' ? 'Admin' : 'Member',
         joined: new Date(newUser.createdAt || Date.now()).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
-        online: true, // newly added users are shown as online
+        online: true,
         tasks: 0,
         activity: 'New',
       };
@@ -57,6 +59,18 @@ export default function Team() {
       socket.disconnect();
     };
   }, []);
+
+  const handleRoleChange = async (memberId, newRole) => {
+    if (!memberId) return;
+    try {
+      const lowerRole = newRole.toLowerCase();
+      await api.put(`/users/${memberId}/role`, { role: lowerRole });
+      setMembers(prev => prev.map(m => m._id === memberId ? { ...m, role: newRole } : m));
+      toast.success('Member role updated');
+    } catch {
+      toast.error('Failed to update role');
+    }
+  };
 
   const filtered = members.filter(m => {
     const matchSearch = m.name?.toLowerCase().includes(search.toLowerCase()) || m.email?.toLowerCase().includes(search.toLowerCase());
@@ -143,7 +157,21 @@ export default function Team() {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span className={`badge ${m.role === 'Admin' ? 'badge-red' : 'badge-gray'}`}>{m.role}</span>
+              <select
+                value={m.role}
+                onChange={e => handleRoleChange(m._id, e.target.value)}
+                style={{
+                  background: m.role === 'Admin' ? '#E5484D18' : 'var(--bg)',
+                  color: m.role === 'Admin' ? '#E5484D' : 'var(--text-2)',
+                  border: `1px solid ${m.role === 'Admin' ? '#E5484D40' : 'var(--border)'}`,
+                  borderRadius: 6, padding: '2px 8px',
+                  fontSize: '0.75rem', fontWeight: 600,
+                  cursor: 'pointer', outline: 'none',
+                }}
+              >
+                <option value="Member">Member</option>
+                <option value="Admin">Admin</option>
+              </select>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-3)' }}>Joined {m.joined}</span>
             </div>
 

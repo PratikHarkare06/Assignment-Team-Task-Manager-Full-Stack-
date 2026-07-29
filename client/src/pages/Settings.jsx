@@ -47,6 +47,8 @@ export default function Settings() {
     reader.readAsDataURL(file);
   };
 
+  const [role, setRole] = useState(user?.role || 'member');
+
   const handleSave = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -54,8 +56,9 @@ export default function Settings() {
       await dispatch(updateUserProfile({
         name: `${profile.firstName} ${profile.lastName}`.trim(),
         avatar: avatarData,
+        role,
       })).unwrap();
-      toast.success('Profile updated!');
+      toast.success('Profile updated! Role set to ' + (role === 'admin' ? 'Admin' : 'Member'));
     } catch (err) {
       toast.error(err || 'Failed to update profile');
     } finally {
@@ -69,14 +72,14 @@ export default function Settings() {
     <div style={{ maxWidth: 720, margin: '0 auto' }}>
       <div style={{ textAlign: 'center', marginBottom: 32 }}>
         <div className="page-title">Account Settings</div>
-        <div className="page-sub">Manage your profile, notifications, and app preferences.</div>
+        <div className="page-sub">Manage your profile, permissions, and app preferences.</div>
       </div>
 
       <div className="card" style={{ marginBottom: 24 }}>
         {/* Profile Info */}
         <div style={{ marginBottom: 24 }}>
           <div style={{ fontWeight: 700, fontSize: '1rem', marginBottom: 4 }}>Profile Information</div>
-          <div style={{ fontSize: '0.8rem', color: 'var(--text-3)', marginBottom: 20 }}>Update your photo and personal details.</div>
+          <div style={{ fontSize: '0.8rem', color: 'var(--text-3)', marginBottom: 20 }}>Update your photo, personal details, and account role.</div>
 
           {/* Avatar */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 24 }}>
@@ -134,11 +137,20 @@ export default function Settings() {
                 <input className="form-input" value={profile.lastName} onChange={e => setProfile({ ...profile, lastName: e.target.value })} />
               </div>
             </div>
-            <div className="form-group">
-              <label className="form-label">Email Address</label>
-              <div style={{ position: 'relative' }}>
-                <Mail size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-3)' }} />
-                <input className="form-input" style={{ paddingLeft: 36 }} value={profile.email} disabled />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div className="form-group">
+                <label className="form-label">Email Address</label>
+                <div style={{ position: 'relative' }}>
+                  <Mail size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-3)' }} />
+                  <input className="form-input" style={{ paddingLeft: 36 }} value={profile.email} disabled />
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Account Role (Permissions)</label>
+                <select className="form-select" value={role} onChange={e => setRole(e.target.value)}>
+                  <option value="admin">Admin (Full Access)</option>
+                  <option value="member">Member (Standard Access)</option>
+                </select>
               </div>
             </div>
             <div className="form-group">

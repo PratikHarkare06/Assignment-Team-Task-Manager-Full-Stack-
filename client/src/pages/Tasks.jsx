@@ -219,11 +219,9 @@ export default function Tasks() {
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <button className="btn btn-secondary" onClick={exportCSV}><Download size={14} /> Export CSV</button>
-          {isAdmin && (
-            <button id="create-task-btn" className="btn btn-primary" onClick={() => setShowModal(true)}>
-              <Plus size={15} /> Create Task
-            </button>
-          )}
+          <button id="create-task-btn" className="btn btn-primary" onClick={() => setShowModal(true)}>
+            <Plus size={15} /> Create Task
+          </button>
         </div>
       </div>
 
@@ -374,14 +372,12 @@ export default function Tasks() {
                                     → {s}
                                   </button>
                                 ))}
-                                {isAdmin && (
-                                  <button
-                                    className="dropdown-item danger"
-                                    onClick={() => { setMenuId(null); handleDelete(task._id); }}
-                                  >
-                                    <Trash2 size={12} /> Delete
-                                  </button>
-                                )}
+                                <button
+                                  className="dropdown-item danger"
+                                  onClick={() => { setMenuId(null); handleDelete(task._id); }}
+                                >
+                                  <Trash2 size={12} /> Delete
+                                </button>
                               </SmartMenu>
                             )}
                           </div>

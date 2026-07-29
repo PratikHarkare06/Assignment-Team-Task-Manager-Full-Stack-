@@ -205,11 +205,13 @@ const deleteTask = async (req, res) => {
     if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
 
     const isCreator = task.createdBy.toString() === req.user._id.toString();
-    if (!isCreator && req.user.role !== 'admin') {
+    const isAssignee = task.assignedTo && task.assignedTo.toString() === req.user._id.toString();
+    const project = task.projectId;
+    const isMember = project && project.members && project.members.some(m => m.toString() === req.user._id.toString());
+
+    if (!isCreator && !isAssignee && !isMember && req.user.role !== 'admin') {
       return res.status(403).json({ success: false, message: 'Not authorized to delete this task' });
     }
-
-    const project = task.projectId;
     await task.deleteOne();
 
     try {
