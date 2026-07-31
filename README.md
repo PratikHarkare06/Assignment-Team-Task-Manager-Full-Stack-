@@ -1,5 +1,9 @@
 # 🚀 Momentum - Enterprise Team Task Manager
 
+📸 Application Preview
+<img width="1470" height="834" alt="Screenshot 2026-07-30 at 12 16 09 AM" src="https://github.com/user-attachments/assets/d609e59a-3bdd-4858-8c0f-66de53513100" />
+
+
 A high-performance, full-stack, real-time Project and Task Management Web Application designed for enterprise teams. 
 
 Built with **React 19, Node.js, Express, MongoDB Atlas, and Socket.io**, and fully deployed on **Render** (via Render Blueprints).
